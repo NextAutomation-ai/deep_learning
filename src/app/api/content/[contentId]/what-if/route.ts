@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getUser } from "@/lib/auth/get-user";
+import { db } from "@/lib/db";
+import { contentChunks, concepts } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { aiComplete } from "@/lib/ai/router";
+import { buildWhatIfPrompt } from "@/lib/ai/prompts/what-if-scenarios";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ contentId: string }> }
+) {
+  try {
+    await getUser();
+    const { contentId } = await params;
+    const body = await request.json();
+    const { scenario, conversationHistory } = body as {
+      scenario: string;
+      conversationHistory: { role: "user" | "ai"; content: string }[];
+    };
+
+    if (!scenario?.trim()) {
+      return NextResponse.json(
+        { error: "Scenario is required" },
+        { status: 400 }
+      );
+    }
+
+    // Load chunks for context (first 5 for token budget)
+    const chunks = db
+      .select()
+      .from(contentChunks)
+      .where(eq(contentChunks.contentId, contentId))
+      .all();
+
+    const sourceContext = chunks
+      .slice(0, 5)
+      .map((c) => c.text)
+      .join("\n\n");
+
+    const allConcepts = db
+      .select()
+      .from(concepts)
+      .where(eq(concepts.contentId, contentId))
+      .all();
+
+    const messages = buildWhatIfPrompt(
+      scenario,
+      sourceContext,
+      allConcepts.map((c) => ({ name: c.name, definition: c.definition })),
+      conversationHistory || []
+    );
+
+    const response = await aiComplete({
+      messages,
+      taskType: "what_if_scenarios",
+    });
+
+    return NextResponse.json({
+      response: response.content.trim(),
+      model: response.model,
+      cached: response.cached,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "AI service temporarily unavailable. Please try again later." },
+      { status: 503 }
+    );
+  }
+}

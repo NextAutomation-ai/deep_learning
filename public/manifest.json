@@ -1,0 +1,21 @@
+{
+  "name": "DeepLearn - AI-Powered Immersive Learning",
+  "short_name": "DeepLearn",
+  "description": "Transform any content into structured, interactive learning experiences.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
