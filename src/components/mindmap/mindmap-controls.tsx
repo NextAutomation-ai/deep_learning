@@ -1,7 +1,7 @@
 "use client";
 
 import { useMindmapStore, type ColorMode } from "@/stores/mindmap-store";
-import { Search, Eye, EyeOff } from "lucide-react";
+import { Search, Eye, EyeOff, List } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const colorModes: { value: ColorMode; label: string }[] = [
@@ -11,7 +11,7 @@ const colorModes: { value: ColorMode; label: string }[] = [
 ];
 
 export function MindmapControls() {
-  const { colorMode, setColorMode, searchQuery, setSearchQuery, showLabels, toggleLabels } =
+  const { colorMode, setColorMode, searchQuery, setSearchQuery, showLabels, toggleLabels, showLegend, toggleLegend } =
     useMindmapStore();
 
   return (
@@ -53,6 +53,18 @@ export function MindmapControls() {
         title={showLabels ? "Hide labels" : "Show labels"}
       >
         {showLabels ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+      </button>
+
+      {/* Legend toggle */}
+      <button
+        onClick={toggleLegend}
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:text-text-primary",
+          showLegend && "border-primary bg-primary/10 text-primary"
+        )}
+        title={showLegend ? "Hide legend" : "Show legend"}
+      >
+        <List className="h-4 w-4" />
       </button>
     </div>
   );

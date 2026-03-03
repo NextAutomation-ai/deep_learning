@@ -29,6 +29,10 @@ const ConceptSidePanel = dynamic(
   () => import("@/components/mindmap/concept-side-panel").then((m) => m.ConceptSidePanel),
   { ssr: false }
 );
+const MindmapLegend = dynamic(
+  () => import("@/components/mindmap/mindmap-legend").then((m) => m.MindmapLegend),
+  { ssr: false }
+);
 const QuizModeSelector = dynamic(
   () => import("@/components/quiz/quiz-mode-selector").then((m) => m.QuizModeSelector),
   { loading: TabSkeleton }
@@ -124,6 +128,7 @@ export function ContentTabs({ content }: { content: ContentInfo }) {
         <Tabs.Content value="mindmap" className="relative flex-1 overflow-hidden">
           <MindmapControls />
           <MindmapCanvas contentId={content.id} />
+          <MindmapLegend />
           {selectedNodeId && <ConceptSidePanel conceptId={selectedNodeId} />}
         </Tabs.Content>
 

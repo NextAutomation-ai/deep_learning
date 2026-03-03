@@ -41,6 +41,33 @@ type ProcessingStatus =
   | "completed"
   | "failed";
 
+const BATCH_SIZE = 5;
+
+async function processInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  processor: (item: T, index: number) => Promise<R>,
+  onBatchComplete?: (completedCount: number, totalCount: number) => void
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let batchStart = 0; batchStart < items.length; batchStart += batchSize) {
+    const batch = items.slice(batchStart, batchStart + batchSize);
+    const batchResults = await Promise.allSettled(
+      batch.map((item, i) => processor(item, batchStart + i))
+    );
+    for (const result of batchResults) {
+      if (result.status === "fulfilled") {
+        results.push(result.value);
+      }
+    }
+    onBatchComplete?.(
+      Math.min(batchStart + batchSize, items.length),
+      items.length
+    );
+  }
+  return results;
+}
+
 function updateStatus(
   contentId: string,
   status: ProcessingStatus,
@@ -138,44 +165,37 @@ export async function processContent(
       .where(eq(contents.id, contentId))
       .run();
 
-    // ---- STEP 3: Extract Concepts (per chunk) ----
+    // ---- STEP 3: Extract Concepts (parallel batches) ----
     updateStatus(contentId, "analyzing", 25, emitter, "Identifying key concepts...");
 
     const allConcepts: (ExtractedConcept & { chunkId: string })[] = [];
     const maxChunksToProcess = Math.min(chunks.length, 50);
 
-    for (let i = 0; i < maxChunksToProcess; i++) {
-      try {
-        const prompt = buildConceptExtractionPrompt(chunkRecords[i].text, i);
+    const conceptResults = await processInBatches(
+      chunkRecords.slice(0, maxChunksToProcess),
+      BATCH_SIZE,
+      async (chunkRecord, i) => {
+        const prompt = buildConceptExtractionPrompt(chunkRecord.text, i);
         const response = await aiComplete({
           messages: prompt,
           taskType: "concept_extraction",
           responseFormat: "json",
         });
-
         const parsed = safeJsonParse<{ concepts: ExtractedConcept[] }>(
           response.content
         );
-        if (parsed?.concepts) {
-          allConcepts.push(
-            ...parsed.concepts.map((c) => ({
-              ...c,
-              chunkId: chunkRecords[i].id,
-            }))
-          );
-        }
-      } catch (err) {
-        console.error(`Concept extraction failed for chunk ${i}:`, err);
+        return (parsed?.concepts || []).map((c) => ({
+          ...c,
+          chunkId: chunkRecord.id,
+        }));
+      },
+      (completed, total) => {
+        const progress = 25 + Math.round((completed / total) * 25);
+        updateStatus(contentId, "analyzing", progress, emitter, `Analyzed ${completed} of ${total} chunks`);
       }
-
-      const progress = 25 + Math.round((i / maxChunksToProcess) * 20);
-      updateStatus(
-        contentId,
-        "analyzing",
-        progress,
-        emitter,
-        `Analyzed chunk ${i + 1} of ${maxChunksToProcess}`
-      );
+    );
+    for (const list of conceptResults) {
+      allConcepts.push(...list);
     }
 
     // Deduplicate concepts by name, keeping highest importance
@@ -230,7 +250,7 @@ export async function processContent(
     updateStatus(
       contentId,
       "analyzing",
-      50,
+      55,
       emitter,
       "Mapping concept relationships..."
     );
@@ -288,18 +308,20 @@ export async function processContent(
       }
     }
 
-    // ---- STEP 5: Extract Arguments ----
-    updateStatus(contentId, "analyzing", 58, emitter, "Extracting arguments...");
+    // ---- STEP 5: Extract Arguments (parallel batches) ----
+    updateStatus(contentId, "analyzing", 60, emitter, "Extracting arguments...");
 
-    for (let i = 0; i < Math.min(maxChunksToProcess, 20); i++) {
-      try {
-        const prompt = buildArgumentExtractionPrompt(chunkRecords[i].text);
+    const argumentChunks = chunkRecords.slice(0, Math.min(maxChunksToProcess, 20));
+    await processInBatches(
+      argumentChunks,
+      BATCH_SIZE,
+      async (chunkRecord) => {
+        const prompt = buildArgumentExtractionPrompt(chunkRecord.text);
         const response = await aiComplete({
           messages: prompt,
           taskType: "argument_extraction",
           responseFormat: "json",
         });
-
         const parsed = safeJsonParse<{ arguments: ExtractedArgument[] }>(
           response.content
         );
@@ -308,7 +330,7 @@ export async function processContent(
             db.insert(arguments_)
               .values({
                 contentId,
-                chunkId: chunkRecords[i].id,
+                chunkId: chunkRecord.id,
                 thesis: arg.thesis,
                 premises: arg.premises || [],
                 evidence: arg.evidence || [],
@@ -322,13 +344,16 @@ export async function processContent(
               .run();
           }
         }
-      } catch (err) {
-        console.error(`Argument extraction failed for chunk ${i}:`, err);
+        return null;
+      },
+      (completed, total) => {
+        const progress = 60 + Math.round((completed / total) * 10);
+        updateStatus(contentId, "analyzing", progress, emitter, `Extracted arguments from ${completed} of ${total} chunks`);
       }
-    }
+    );
 
-    // ---- STEP 6: Generate Quizzes ----
-    updateStatus(contentId, "generating", 65, emitter, "Generating quiz questions...");
+    // ---- STEP 6: Generate Quizzes (all difficulties in parallel) ----
+    updateStatus(contentId, "generating", 75, emitter, "Generating quiz questions...");
 
     const conceptsForQuiz = uniqueConcepts.slice(0, 15).map((c) => ({
       name: c.name,
@@ -339,56 +364,58 @@ export async function processContent(
       insertedConcepts.map((c) => [c.name.toLowerCase(), c.id])
     );
 
-    for (const difficulty of ["easy", "medium", "hard"] as const) {
-      try {
-        const prompt = buildQuizGenerationPrompt(
-          textContext,
-          conceptsForQuiz,
-          difficulty
-        );
-        const response = await aiComplete({
-          messages: prompt,
-          taskType: "mcq_generation",
-          responseFormat: "json",
-        });
+    await Promise.allSettled(
+      (["easy", "medium", "hard"] as const).map(async (difficulty) => {
+        try {
+          const prompt = buildQuizGenerationPrompt(
+            textContext,
+            conceptsForQuiz,
+            difficulty
+          );
+          const response = await aiComplete({
+            messages: prompt,
+            taskType: "mcq_generation",
+            responseFormat: "json",
+          });
 
-        const parsed = safeJsonParse<{ questions: GeneratedQuestion[] }>(
-          response.content
-        );
-        if (parsed?.questions) {
-          for (const q of parsed.questions) {
-            const conceptId = q.related_concept
-              ? conceptIdLookup.get(q.related_concept.toLowerCase()) || null
-              : null;
+          const parsed = safeJsonParse<{ questions: GeneratedQuestion[] }>(
+            response.content
+          );
+          if (parsed?.questions) {
+            for (const q of parsed.questions) {
+              const conceptId = q.related_concept
+                ? conceptIdLookup.get(q.related_concept.toLowerCase()) || null
+                : null;
 
-            db.insert(questions)
-              .values({
-                contentId,
-                conceptId,
-                questionType: (isValidQuestionType(q.question_type)
-                  ? q.question_type
-                  : "mcq") as "mcq",
-                questionText: q.question_text,
-                options: q.options || null,
-                correctAnswer: q.correct_answer,
-                explanation: q.explanation,
-                difficultyLevel: q.difficulty_level || 1,
-                bloomsLevel: (isValidBloomsLevel(q.blooms_level)
-                  ? q.blooms_level
-                  : "remember") as "remember",
-                points: q.points || 10,
-                timeLimitSeconds: q.time_limit_seconds || 60,
-              })
-              .run();
+              db.insert(questions)
+                .values({
+                  contentId,
+                  conceptId,
+                  questionType: (isValidQuestionType(q.question_type)
+                    ? q.question_type
+                    : "mcq") as "mcq",
+                  questionText: q.question_text,
+                  options: q.options || null,
+                  correctAnswer: q.correct_answer,
+                  explanation: q.explanation,
+                  difficultyLevel: q.difficulty_level || 1,
+                  bloomsLevel: (isValidBloomsLevel(q.blooms_level)
+                    ? q.blooms_level
+                    : "remember") as "remember",
+                  points: q.points || 10,
+                  timeLimitSeconds: q.time_limit_seconds || 60,
+                })
+                .run();
+            }
           }
+        } catch (err) {
+          console.error(`Quiz generation (${difficulty}) failed:`, err);
         }
-      } catch (err) {
-        console.error(`Quiz generation (${difficulty}) failed:`, err);
-      }
-    }
+      })
+    );
 
     // ---- STEP 7: Generate Flashcards ----
-    updateStatus(contentId, "generating", 80, emitter, "Creating flashcards...");
+    updateStatus(contentId, "generating", 85, emitter, "Creating flashcards...");
 
     try {
       const conceptsForFlashcards = uniqueConcepts.slice(0, 30).map((c) => ({

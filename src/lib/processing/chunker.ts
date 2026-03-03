@@ -5,8 +5,8 @@ export interface ChunkOptions {
 }
 
 const DEFAULT_OPTIONS: ChunkOptions = {
-  maxChunkSize: 2000,
-  overlapSize: 200,
+  maxChunkSize: 4000,
+  overlapSize: 300,
   separator: "\n\n",
 };
 

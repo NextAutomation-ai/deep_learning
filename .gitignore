@@ -37,7 +37,7 @@ yarn-error.log*
 .vercel
 
 # database & uploads
-# /data/
+/data/
 
 # typescript
 *.tsbuildinfo
