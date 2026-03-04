@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
+import { verifyContentOwnership } from "@/lib/auth/verify-content-owner";
 import { db } from "@/lib/db";
 import { devilsAdvocateDebates, userStats } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -17,7 +18,13 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ contentId: string; debateId: string }> }
 ) {
-  const { debateId } = await params;
+  const { contentId, debateId } = await params;
+
+  const session = await getUser();
+  if (!verifyContentOwnership(contentId, session.user.id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const debate = db
     .select()
     .from(devilsAdvocateDebates)
@@ -37,7 +44,12 @@ export async function POST(
 ) {
   try {
     const user = await getUser();
-    const { debateId } = await params;
+    const { contentId, debateId } = await params;
+
+    if (!verifyContentOwnership(contentId, user.user.id)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const body = await request.json();
     const { message, action } = body as {
       message?: string;

@@ -30,6 +30,7 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
     const svg = d3.select(svgRef.current);
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
+    const nodeCount = data.nodes.length;
 
     svg.selectAll("*").remove();
 
@@ -52,12 +53,21 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
       }
     }
 
+    // Dynamic force parameters based on node count
+    const isLarge = nodeCount > 50;
+    const isMedium = nodeCount > 15;
+    const linkDist = isLarge ? 100 : isMedium ? 150 : 200;
+    const chargeStr = isLarge ? -200 : isMedium ? -350 : -500;
+    const collisionPad = isLarge ? 8 : 14;
+
     // Zoom
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 4])
+      .scaleExtent([0.05, 6])
       .on("zoom", (event) => container.attr("transform", event.transform));
     svg.call(zoom);
+    // Disable double-click zoom (interferes with node clicking on mobile)
+    svg.on("dblclick.zoom", null);
 
     const container = svg.append("g");
 
@@ -78,7 +88,7 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
       )
       .map((l) => ({ ...l }));
 
-    // Simulation with improved forces
+    // Simulation with dynamic forces
     const simulation = d3
       .forceSimulation<SimNode>(filteredNodes)
       .force(
@@ -86,16 +96,16 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
         d3
           .forceLink<SimNode, SimLink>(filteredLinks)
           .id((d) => d.id)
-          .distance(180)
+          .distance(linkDist)
           .strength((d) => (d.strength ?? 0.5) * 0.3)
       )
-      .force("charge", d3.forceManyBody().strength(-400))
+      .force("charge", d3.forceManyBody().strength(chargeStr))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "collision",
         d3
           .forceCollide<SimNode>()
-          .radius((d) => getRadius(d.importanceScore) + 16)
+          .radius((d) => getRadius(d.importanceScore, nodeCount) + collisionPad)
       );
 
     // Links — styled by relationship type
@@ -172,7 +182,7 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
       .selectAll("circle")
       .data(filteredNodes)
       .join("circle")
-      .attr("r", (d) => getRadius(d.importanceScore))
+      .attr("r", (d) => getRadius(d.importanceScore, nodeCount))
       .attr("fill", (d) => getColor(d, colorMode))
       .attr("stroke", "#fff")
       .attr("stroke-width", 2)
@@ -203,23 +213,30 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
     // Tooltips
     node.append("title").text((d) => `${d.name}\n${d.definition}`);
 
-    // Labels — below nodes, truncated, scaled by importance, with text stroke for readability
+    // Labels — scale based on node count
+    const labelFontSize = isLarge ? 8 : isMedium ? 10 : 12;
+    const labelTruncate = isLarge ? 14 : isMedium ? 18 : 24;
+
     const label = container
       .append("g")
       .selectAll("text")
       .data(filteredNodes)
       .join("text")
-      .text((d) => (d.name.length > 22 ? d.name.slice(0, 20) + "\u2026" : d.name))
+      .text((d) =>
+        d.name.length > labelTruncate
+          ? d.name.slice(0, labelTruncate - 2) + "\u2026"
+          : d.name
+      )
       .attr("font-size", (d) => {
         const importance = d.importanceScore ?? 0.5;
-        return Math.max(10, 9 + importance * 4);
+        return Math.max(labelFontSize, labelFontSize - 2 + importance * 6);
       })
       .attr("font-weight", (d) =>
         (d.importanceScore ?? 0.5) > 0.7 ? "600" : "400"
       )
       .attr("fill", "var(--color-text-primary)")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => getRadius(d.importanceScore) + 14)
+      .attr("dy", (d) => getRadius(d.importanceScore, nodeCount) + 14)
       .attr("pointer-events", "none")
       .style("display", showLabels ? "block" : "none")
       .style("paint-order", "stroke")
@@ -256,7 +273,7 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
       label.attr("x", (d) => d.x!).attr("y", (d) => d.y!);
     });
 
-    // Initial zoom to fit
+    // Initial zoom to fit all content
     setTimeout(() => {
       const bounds = container.node()?.getBBox();
       if (bounds) {
@@ -264,9 +281,11 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
         const dy = bounds.height;
         const x = bounds.x + dx / 2;
         const y = bounds.y + dy / 2;
+        const padFactor = isLarge ? 0.85 : 0.9;
+        const maxScale = isLarge ? 0.6 : 1.2;
         const scale = Math.min(
-          0.8,
-          0.9 / Math.max(dx / width, dy / height)
+          maxScale,
+          padFactor / Math.max(dx / width, dy / height)
         );
         const transform = d3.zoomIdentity
           .translate(width / 2, height / 2)
@@ -274,7 +293,7 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
           .translate(-x, -y);
         svg.transition().duration(750).call(zoom.transform, transform);
       }
-    }, 1000);
+    }, 1200);
 
     return () => {
       simulation.stop();
@@ -300,8 +319,11 @@ export function MindmapCanvas({ contentId }: { contentId: string }) {
   return <svg ref={svgRef} className="h-full w-full" />;
 }
 
-function getRadius(importance: number | null): number {
-  return 8 + (importance ?? 0.5) * 18;
+function getRadius(importance: number | null, nodeCount: number): number {
+  // Scale nodes based on total count
+  if (nodeCount > 100) return 6 + (importance ?? 0.5) * 10;
+  if (nodeCount > 30) return 10 + (importance ?? 0.5) * 14;
+  return 14 + (importance ?? 0.5) * 20;
 }
 
 function getLinkColor(type: string | null): string {

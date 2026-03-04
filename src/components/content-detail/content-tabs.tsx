@@ -92,7 +92,9 @@ export function ContentTabs({ content }: { content: ContentInfo }) {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="border-b border-border bg-surface px-6 py-4">
-        <h1 className="text-xl font-bold text-text-primary">{content.title}</h1>
+        <h1 className="break-words text-xl font-bold text-text-primary line-clamp-2">
+          {content.title}
+        </h1>
         <p className="mt-1 text-sm text-text-secondary">
           {content.conceptCount} concepts &middot; {content.questionCount} questions &middot;{" "}
           {content.flashcardCount} flashcards
@@ -125,7 +127,7 @@ export function ContentTabs({ content }: { content: ContentInfo }) {
           <OverviewTab contentId={content.id} content={content} />
         </Tabs.Content>
 
-        <Tabs.Content value="mindmap" className="relative flex-1 overflow-hidden">
+        <Tabs.Content value="mindmap" className="relative min-h-[60vh] flex-1 overflow-hidden">
           <MindmapControls />
           <MindmapCanvas contentId={content.id} />
           <MindmapLegend />

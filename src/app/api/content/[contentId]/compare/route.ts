@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
+import { verifyContentOwnership } from "@/lib/auth/verify-content-owner";
 import { db } from "@/lib/db";
 import { concepts, contentChunks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -14,8 +15,11 @@ export async function POST(
   { params }: { params: Promise<{ contentId: string }> }
 ) {
   try {
-    await getUser();
+    const session = await getUser();
     const { contentId } = await params;
+    if (!verifyContentOwnership(contentId, session.user.id)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     const body = await request.json();
     const { conceptIdA, conceptIdB } = body as {
       conceptIdA: string;

@@ -3,6 +3,8 @@
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useExplainConcept } from "@/hooks/use-concepts";
 import { useState } from "react";
+import { useGuestGate } from "@/hooks/use-guest-gate";
+import { SignInGate } from "@/components/auth/sign-in-gate";
 
 interface Concept {
   id: string;
@@ -39,6 +41,7 @@ export function LessonViewer({
   const [currentConceptIndex, setCurrentConceptIndex] = useState(0);
   const explainMutation = useExplainConcept();
   const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
+  const { isGuest, gateOpen, setGateOpen, requireAuth } = useGuestGate();
 
   const currentConcept = concepts[currentConceptIndex];
   const isLast = currentConceptIndex === concepts.length - 1;
@@ -146,14 +149,14 @@ export function LessonViewer({
         {/* Explain buttons */}
         <div className="mt-4 flex gap-2">
           <button
-            onClick={() => handleExplain("simpler")}
+            onClick={() => requireAuth(() => handleExplain("simpler"))}
             disabled={explainMutation.isPending}
             className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
           >
             Explain Simpler
           </button>
           <button
-            onClick={() => handleExplain("deeper")}
+            onClick={() => requireAuth(() => handleExplain("deeper"))}
             disabled={explainMutation.isPending}
             className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
           >
@@ -189,6 +192,13 @@ export function LessonViewer({
           </button>
         )}
       </div>
+
+      <SignInGate
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        featureName="AI Explanations"
+        message="Sign in to get AI-powered simplified and in-depth explanations."
+      />
     </div>
   );
 }

@@ -7,7 +7,11 @@ import {
   Lightbulb,
   GitCompareArrows,
   Loader2,
+  Lock,
+  LogIn,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { useDeepDiveStore, type DeepDiveMode } from "@/stores/deep-dive-store";
 import { useDeepDiveAsk, useWhatIfAsk, useCompareConcepts } from "@/hooks/use-deep-dive";
@@ -25,6 +29,8 @@ interface DeepDiveChatProps {
 }
 
 export function DeepDiveChat({ contentId }: DeepDiveChatProps) {
+  const { data: sessionData } = useSession();
+  const isGuest = !sessionData?.user;
   const store = useDeepDiveStore();
   const askMutation = useDeepDiveAsk(contentId);
   const whatIfMutation = useWhatIfAsk(contentId);
@@ -42,6 +48,31 @@ export function DeepDiveChat({ contentId }: DeepDiveChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [store.messages]);
+
+  if (isGuest) {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-surface p-8 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+          <Lock className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-text-primary">
+            Unlock Deep Dive
+          </h3>
+          <p className="mt-1 text-sm text-text-secondary">
+            Sign in to have AI-powered conversations about this content.
+          </p>
+        </div>
+        <Link
+          href="/login"
+          className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+        >
+          <LogIn className="h-4 w-4" />
+          Sign In
+        </Link>
+      </div>
+    );
+  }
 
   const handleSend = async () => {
     const text = input.trim();

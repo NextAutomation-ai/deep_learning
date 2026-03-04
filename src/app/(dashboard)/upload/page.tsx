@@ -3,9 +3,10 @@
 import { UploadZone } from "@/components/content/upload-zone";
 import { useContents } from "@/hooks/use-content";
 import { ProcessingStatusBar } from "@/components/content/processing-status";
-import { Upload, FileText, Globe, Type, CheckCircle } from "lucide-react";
+import { Upload, FileText, Globe, Type, CheckCircle, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 const formats = [
   { label: "PDF", icon: FileText },
@@ -17,8 +18,10 @@ const formats = [
 
 export default function UploadPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { data } = useContents({ sort: "newest" });
   const recentUploads = data?.contents?.slice(0, 5) ?? [];
+  const isGuest = !session?.user;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -31,9 +34,30 @@ export default function UploadPage() {
         </p>
       </div>
 
-      <UploadZone
-        onUploadComplete={(id) => router.push(`/content/${id}`)}
-      />
+      {isGuest ? (
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-surface p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Upload className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-text-primary">Sign in to upload</h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              Create an account to upload and process learning materials.
+            </p>
+          </div>
+          <Link
+            href="/login"
+            className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Link>
+        </div>
+      ) : (
+        <UploadZone
+          onUploadComplete={(id) => router.push(`/content/${id}`)}
+        />
+      )}
 
       {/* Supported formats */}
       <div className="rounded-xl border border-border bg-surface p-6">

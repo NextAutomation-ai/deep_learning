@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { contents, concepts, questions, flashcards } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { getUser } from "@/lib/auth/get-user";
 import { ContentTabs } from "@/components/content-detail/content-tabs";
 
 export default async function ContentDetailPage({
@@ -9,12 +10,13 @@ export default async function ContentDetailPage({
 }: {
   params: Promise<{ contentId: string }>;
 }) {
+  const session = await getUser();
   const { contentId } = await params;
 
   const content = db
     .select()
     .from(contents)
-    .where(eq(contents.id, contentId))
+    .where(and(eq(contents.id, contentId), eq(contents.userId, session.user.id)))
     .get();
 
   if (!content) redirect("/library");

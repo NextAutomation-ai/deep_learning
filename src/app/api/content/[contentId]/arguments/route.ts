@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUser } from "@/lib/auth/get-user";
+import { verifyContentOwnership } from "@/lib/auth/verify-content-owner";
 import { db } from "@/lib/db";
 import { arguments_ } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,6 +10,11 @@ export async function GET(
   { params }: { params: Promise<{ contentId: string }> }
 ) {
   const { contentId } = await params;
+
+  const session = await getUser();
+  if (!verifyContentOwnership(contentId, session.user.id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const args = db
     .select()

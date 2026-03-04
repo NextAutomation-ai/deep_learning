@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import { LoginForm } from "@/components/auth/login-form";
 
-export default async function LoginPage() {
-  // Auth hidden — redirect to dashboard directly
-  redirect("/dashboard");
+export default function LoginPage() {
+  return <LoginForm />;
 }

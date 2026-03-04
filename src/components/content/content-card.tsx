@@ -18,7 +18,7 @@ import {
 } from "@/hooks/use-content";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
 import { cn } from "@/lib/utils/cn";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 const sourceTypeIcons: Record<string, typeof FileText> = {
@@ -44,6 +44,19 @@ export function ContentCard({ content }: { content: ContentItem }) {
   const favoriteMutation = useFavoriteContent();
   const router = useRouter();
   const Icon = sourceTypeIcons[content.sourceType] || HelpCircle;
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
 
   const isProcessing =
     content.processingStatus !== "completed" &&
@@ -68,51 +81,54 @@ export function ContentCard({ content }: { content: ContentItem }) {
     <div
       className="group relative cursor-pointer rounded-xl border border-border bg-surface p-5 transition-all hover:shadow-md"
       onClick={() => {
-        if (content.processingStatus === "completed") {
+        if (
+          content.processingStatus === "completed" &&
+          !showDeleteConfirm &&
+          !showMenu &&
+          !deleteMutation.isPending
+        ) {
           router.push(`/content/${content.id}`);
         }
       }}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <div
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg",
+            content.processingStatus === "completed"
+              ? "bg-success/10"
+              : content.processingStatus === "failed"
+                ? "bg-danger/10"
+                : "bg-primary/10"
+          )}
+        >
+          <Icon
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-lg",
+              "h-5 w-5",
               content.processingStatus === "completed"
-                ? "bg-success/10"
+                ? "text-success"
                 : content.processingStatus === "failed"
-                  ? "bg-danger/10"
-                  : "bg-primary/10"
+                  ? "text-danger"
+                  : "text-primary"
             )}
-          >
-            <Icon
-              className={cn(
-                "h-5 w-5",
-                content.processingStatus === "completed"
-                  ? "text-success"
-                  : content.processingStatus === "failed"
-                    ? "text-danger"
-                    : "text-primary"
-              )}
-            />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-medium text-text-primary line-clamp-1">
-              {content.title}
-            </h3>
-            <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary">
-              <span className="rounded bg-background px-1.5 py-0.5">
-                {sourceTypeLabels[content.sourceType] || content.sourceType}
-              </span>
-              {content.fileSize && (
-                <span>{formatFileSize(content.fileSize)}</span>
-              )}
-              <span>{formatDate(content.createdAt)}</span>
-            </div>
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate font-medium text-text-primary">
+            {content.title}
+          </h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+            <span className="flex-shrink-0 rounded bg-background px-1.5 py-0.5">
+              {sourceTypeLabels[content.sourceType] || content.sourceType}
+            </span>
+            {content.fileSize && (
+              <span className="flex-shrink-0">{formatFileSize(content.fileSize)}</span>
+            )}
+            <span className="flex-shrink-0">{formatDate(content.createdAt)}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex flex-shrink-0 items-center gap-1">
           <button
             title={content.isFavorited ? "Remove from favorites" : "Add to favorites"}
             onClick={(e) => {
@@ -133,7 +149,7 @@ export function ContentCard({ content }: { content: ContentItem }) {
               )}
             />
           </button>
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
           <button
             title="More options"
             onClick={(e) => {

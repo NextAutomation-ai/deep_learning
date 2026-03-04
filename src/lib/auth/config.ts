@@ -1,6 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
-import GitHub from "next-auth/providers/github";
 
 // Edge-compatible base config (no DB adapter — used by middleware)
 export const authConfig: NextAuthConfig = {
@@ -8,10 +7,6 @@ export const authConfig: NextAuthConfig = {
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
-    }),
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID!,
-      clientSecret: process.env.AUTH_GITHUB_SECRET!,
     }),
   ],
   pages: {
@@ -21,13 +16,21 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const protectedPaths = ["/dashboard", "/library"];
-      const isProtected = protectedPaths.some((path) =>
-        nextUrl.pathname.startsWith(path)
-      );
-      if (isProtected && !isLoggedIn) {
-        return false;
+      const { pathname } = nextUrl;
+
+      // Public paths — always allowed
+      const publicPaths = ["/login", "/api/auth"];
+      if (publicPaths.some((path) => pathname.startsWith(path))) {
+        return true;
       }
+
+      // Write API routes — require auth (guests can't upload/process)
+      const protectedApis = ["/api/content/upload", "/api/process"];
+      if (protectedApis.some((path) => pathname.startsWith(path)) && !isLoggedIn) {
+        return Response.json({ error: "Sign in required to upload content" }, { status: 401 });
+      }
+
+      // All other routes (pages + read APIs) — allow guests through
       return true;
     },
   },

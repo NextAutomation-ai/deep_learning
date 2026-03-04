@@ -9,6 +9,8 @@ import {
   GraduationCap,
   ArrowLeft,
 } from "lucide-react";
+import { useGuestGate } from "@/hooks/use-guest-gate";
+import { SignInGate } from "@/components/auth/sign-in-gate";
 import { SocraticStarter } from "./socratic-starter";
 import { SocraticSession } from "./socratic-session";
 import { ArgumentMap } from "./argument-map";
@@ -68,6 +70,7 @@ const modules = [
 export function ThinkTab({ contentId }: { contentId: string }) {
   const { activeModule, setActiveModule, socraticSessionId, debateId, reset } =
     useCriticalThinkingStore();
+  const { isGuest, gateOpen, setGateOpen } = useGuestGate();
 
   const handleBack = () => {
     reset();
@@ -130,7 +133,13 @@ export function ThinkTab({ contentId }: { contentId: string }) {
         {modules.map((mod) => (
           <button
             key={mod.id}
-            onClick={() => setActiveModule(mod.id)}
+            onClick={() => {
+              if (isGuest) {
+                setGateOpen(true);
+              } else {
+                setActiveModule(mod.id);
+              }
+            }}
             className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4 text-left transition-all hover:shadow-md"
           >
             <div
@@ -150,6 +159,13 @@ export function ThinkTab({ contentId }: { contentId: string }) {
           </button>
         ))}
       </div>
+
+      <SignInGate
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        featureName="Critical Thinking"
+        message="Sign in to access AI-powered critical thinking exercises."
+      />
     </div>
   );
 }

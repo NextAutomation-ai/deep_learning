@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
-import { contents, contentChunks, concepts, questions, flashcards } from "@/lib/db/schema";
+import { contents, contentChunks, concepts, questions, flashcards, userProgress, quizAttempts, learningSessions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export async function GET(
@@ -72,7 +72,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // CASCADE delete handles related records
+  // Delete from tables without cascade before deleting content
+  db.delete(userProgress).where(eq(userProgress.contentId, contentId)).run();
+  db.delete(quizAttempts).where(eq(quizAttempts.contentId, contentId)).run();
+  db.delete(learningSessions).where(eq(learningSessions.contentId, contentId)).run();
+
+  // CASCADE delete handles remaining related records (chunks, concepts, questions, flashcards, etc.)
   db.delete(contents).where(eq(contents.id, contentId)).run();
 
   return NextResponse.json({ success: true });

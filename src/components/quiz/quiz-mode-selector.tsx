@@ -2,8 +2,11 @@
 
 import { useStartQuiz } from "@/hooks/use-quiz";
 import { useQuizStore } from "@/stores/quiz-store";
-import { Zap, Brain, Trophy, Timer } from "lucide-react";
+import { Zap, Brain, Trophy, Timer, Lock } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useGuestGate } from "@/hooks/use-guest-gate";
+import { SignInGate } from "@/components/auth/sign-in-gate";
+import { toastError } from "@/hooks/use-toast";
 
 const modes = [
   {
@@ -36,13 +39,25 @@ const modes = [
   },
 ];
 
+const gatedModes = new Set(["boss_battle", "speed_round"]);
+
 export function QuizModeSelector({ contentId }: { contentId: string }) {
   const startQuizMutation = useStartQuiz();
   const startQuiz = useQuizStore((s) => s.startQuiz);
+  const { isGuest, gateOpen, setGateOpen } = useGuestGate();
 
   const handleStart = async (mode: string) => {
-    const result = await startQuizMutation.mutateAsync({ contentId, mode });
-    startQuiz(result.quizId, result.mode, result.questions);
+    if (isGuest && gatedModes.has(mode)) {
+      setGateOpen(true);
+      return;
+    }
+    try {
+      const result = await startQuizMutation.mutateAsync({ contentId, mode });
+      startQuiz(result.quizId, result.mode, result.questions);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to start quiz";
+      toastError("Quiz Error", msg);
+    }
   };
 
   return (
@@ -59,10 +74,16 @@ export function QuizModeSelector({ contentId }: { contentId: string }) {
             onClick={() => handleStart(mode.id)}
             disabled={startQuizMutation.isPending}
             className={cn(
-              "flex flex-col items-start gap-3 rounded-xl border border-border bg-surface p-5 text-left transition-all hover:shadow-md disabled:opacity-50",
+              "relative flex flex-col items-start gap-3 rounded-xl border border-border bg-surface p-5 text-left transition-all hover:shadow-md disabled:opacity-50",
               `hover:border-${mode.color}`
             )}
           >
+            {isGuest && gatedModes.has(mode.id) && (
+              <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                <Lock className="h-3 w-3" />
+                Sign in
+              </span>
+            )}
             <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", `bg-${mode.color}/10`)}>
               <mode.icon className={cn("h-6 w-6", `text-${mode.color}`)} />
             </div>
@@ -77,6 +98,13 @@ export function QuizModeSelector({ contentId }: { contentId: string }) {
       {startQuizMutation.isPending && (
         <p className="text-center text-sm text-text-secondary">Loading questions...</p>
       )}
+
+      <SignInGate
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        featureName="Advanced Quiz Modes"
+        message="Sign in to access Boss Battle and Speed Round modes."
+      />
     </div>
   );
 }

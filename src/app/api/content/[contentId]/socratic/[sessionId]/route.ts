@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
+import { verifyContentOwnership } from "@/lib/auth/verify-content-owner";
 import { db } from "@/lib/db";
 import { socraticSessions, concepts, userStats } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -17,7 +18,13 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ contentId: string; sessionId: string }> }
 ) {
-  const { sessionId } = await params;
+  const userSession = await getUser();
+  const { contentId, sessionId } = await params;
+
+  if (!verifyContentOwnership(contentId, userSession.user.id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const session = db
     .select()
     .from(socraticSessions)
@@ -37,7 +44,11 @@ export async function POST(
 ) {
   try {
     const user = await getUser();
-    const { sessionId } = await params;
+    const { contentId, sessionId } = await params;
+
+    if (!verifyContentOwnership(contentId, user.user.id)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     const body = await request.json();
     const { message, action } = body as {
       message?: string;

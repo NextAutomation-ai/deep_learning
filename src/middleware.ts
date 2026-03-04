@@ -1,16 +1,11 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth/config";
 
-// Auth middleware disabled — passthrough for all routes.
-// To re-enable auth, replace with:
-// import NextAuth from "next-auth";
-// import { authConfig } from "@/lib/auth/config";
-// export default NextAuth(authConfig).auth;
-
-export function middleware(_request: NextRequest) {
-  return NextResponse.next();
-}
+export default NextAuth(authConfig).auth;
 
 export const config = {
-  matcher: [],
+  matcher: [
+    // Protect all routes except static files, images, and auth endpoints
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.json|icons|sw.js).*)",
+  ],
 };

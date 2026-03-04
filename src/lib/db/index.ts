@@ -37,3 +37,7 @@ if (!defaultUser) {
     })
     .run();
 }
+
+// Seed guest demo content (2 sample topics for guest users to explore)
+import { seedGuestContent } from "./seed-guest-content";
+seedGuestContent();

@@ -5,8 +5,14 @@ import { useFlashcardStore } from "@/stores/flashcard-store";
 import { FlashcardCard } from "./flashcard-card";
 import { FlashcardRating } from "./flashcard-rating";
 import { Layers, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { SignInGate } from "@/components/auth/sign-in-gate";
 
 export function FlashcardDeck({ contentId }: { contentId: string }) {
+  const { data: sessionData } = useSession();
+  const isGuest = !sessionData?.user;
+  const [showGate, setShowGate] = useState(false);
   const { data, isLoading } = useFlashcards(contentId);
   const reviewMutation = useReviewFlashcard();
   const {
@@ -125,6 +131,11 @@ export function FlashcardDeck({ contentId }: { contentId: string }) {
       });
     }
 
+    if (isGuest && currentIndex === 0) {
+      setShowGate(true);
+      return;
+    }
+
     nextCard();
   };
 
@@ -161,6 +172,13 @@ export function FlashcardDeck({ contentId }: { contentId: string }) {
           Click or press Space to reveal answer
         </p>
       )}
+
+      <SignInGate
+        open={showGate}
+        onOpenChange={setShowGate}
+        featureName="Flashcards"
+        message="You've previewed 1 flashcard! Sign in to study all cards and track your progress."
+      />
     </div>
   );
 }

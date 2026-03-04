@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@/lib/auth/get-user";
+import { requireAuth } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { contents } from "@/lib/db/schema";
 import { writeFile, mkdir } from "fs/promises";
@@ -8,7 +8,7 @@ import { isYoutubeUrl } from "@/lib/processing/extractors/youtube";
 import { checkBadges, awardBadges } from "@/lib/gamification/badge-engine";
 
 export async function POST(request: NextRequest) {
-  const session = await getUser();
+  const session = await requireAuth();
 
   let formData: FormData;
   try {

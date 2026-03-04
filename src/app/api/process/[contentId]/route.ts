@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@/lib/auth/get-user";
+import { requireAuth } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import {
   contents,
@@ -18,7 +18,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ contentId: string }> }
 ) {
-  const session = await getUser();
+  const session = await requireAuth();
 
   const { contentId } = await params;
   const body = await request.json().catch(() => ({}));
