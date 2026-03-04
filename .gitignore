@@ -38,6 +38,10 @@ yarn-error.log*
 
 # database & uploads
 /data/
+*.db
+*.db-shm
+*.db-wal
+*.pdf
 
 # typescript
 *.tsbuildinfo

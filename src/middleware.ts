@@ -1,11 +1,14 @@
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth/config";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default NextAuth(authConfig).auth;
+export function middleware(request: NextRequest) {
+  // Redirect root to dashboard
+  if (request.nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: [
-    // Protect all routes except static files, images, and auth endpoints
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.json|icons|sw.js).*)",
-  ],
+  matcher: ["/"],
 };

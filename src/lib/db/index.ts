@@ -4,7 +4,7 @@ import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
 
-const dataDir = path.join(process.cwd(), "data");
+const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -38,6 +38,20 @@ if (!defaultUser) {
     .run();
 }
 
-// Seed guest demo content (2 sample topics for guest users to explore)
-import { seedGuestContent } from "./seed-guest-content";
+// Reset guest user progress on every startup so guests always start fresh
+import { eq } from "drizzle-orm";
+db.delete(schema.userStats).where(eq(schema.userStats.userId, "default-user")).run();
+db.delete(schema.userProgress).where(eq(schema.userProgress.userId, "default-user")).run();
+db.delete(schema.quizAttempts).where(eq(schema.quizAttempts.userId, "default-user")).run();
+
+// Seed sample content for guest and all existing users
+import { seedGuestContent, seedSampleContentForUser } from "./seed-sample-content";
 seedGuestContent();
+
+// Seed sample content for any existing signed-in users who don't have content yet
+const allUsers = db.select().from(schema.users).all();
+for (const u of allUsers) {
+  if (u.id !== "default-user") {
+    seedSampleContentForUser(u.id);
+  }
+}

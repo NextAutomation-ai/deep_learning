@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { ConfirmDialog } from "@/components/settings/confirm-dialog";
-import { Sun, Moon, Monitor, Download, Trash2, User, BookOpen, Palette } from "lucide-react";
+import { Sun, Moon, Monitor, Download, Trash2, User, BookOpen, Palette, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
-import { DEFAULT_USER } from "@/lib/auth/default-user";
+import Link from "next/link";
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
+  const user = session?.user;
+  const isGuest = !user;
   const { preferences, setPreference } = useSettingsStore();
   const { theme, setTheme } = useThemeStore();
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -64,16 +68,40 @@ export default function SettingsPage() {
           <User className="h-5 w-5 text-text-secondary" />
           <h2 className="text-lg font-semibold text-text-primary">Profile</h2>
         </div>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-text-secondary">Display Name</label>
-            <p className="mt-1 font-medium text-text-primary">{DEFAULT_USER.name}</p>
+        {isGuest ? (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <p className="text-sm text-text-secondary">
+              Sign in to view and manage your profile
+            </p>
+            <Link
+              href="/login"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+            >
+              <LogIn className="h-4 w-4" />
+              Sign In
+            </Link>
           </div>
-          <div>
-            <label className="text-sm text-text-secondary">Email</label>
-            <p className="mt-1 text-text-primary">{DEFAULT_USER.email}</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              {user.image ? (
+                <img
+                  src={user.image}
+                  alt={user.name || "User"}
+                  className="h-14 w-14 rounded-full"
+                />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-lg font-bold text-white">
+                  {user.name?.[0] || user.email?.[0] || "?"}
+                </div>
+              )}
+              <div>
+                <p className="font-medium text-text-primary">{user.name || "User"}</p>
+                <p className="text-sm text-text-secondary">{user.email}</p>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {/* Study Preferences */}

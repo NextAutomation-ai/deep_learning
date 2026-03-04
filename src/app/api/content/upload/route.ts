@@ -57,8 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Save file to disk
     const uploadDir = path.join(
-      process.cwd(),
-      "data",
+      process.env.DATA_DIR || path.join(process.cwd(), "data"),
       "uploads",
       session.user.id
     );
