@@ -16,10 +16,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-
-# Create DB schema before build so Next.js page collection doesn't crash
-RUN npx drizzle-kit push
-
 RUN npm run build
 
 # ── Stage 3: Production runner ──
