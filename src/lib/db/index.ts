@@ -21,16 +21,10 @@ sqlite.pragma("foreign_keys = ON");
 export const db = drizzle(sqlite, { schema });
 export type Database = typeof db;
 
-// Run migrations to create tables if they don't exist (safe to re-run)
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-try {
-  migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
-} catch {
-  // During build phase, migration folder may not be available
-}
+// Create all tables if they don't exist (embedded SQL — no external files needed)
+import { createSchema } from "./create-schema";
+createSchema(sqlite);
 
-// All seed/init code wrapped in try-catch so it doesn't crash during
-// Next.js build phase (tables may not exist yet during Docker build)
 import { eq } from "drizzle-orm";
 import { seedGuestContent, seedSampleContentForUser } from "./seed-sample-content";
 
