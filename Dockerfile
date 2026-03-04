@@ -16,6 +16,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Generate drizzle migration SQL files (needed for runtime table creation)
+RUN npx drizzle-kit generate
+
 RUN npm run build
 
 # ── Stage 3: Production runner ──
