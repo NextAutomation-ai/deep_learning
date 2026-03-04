@@ -28,8 +28,7 @@ import type {
   GeneratedFlashcard,
 } from "@/lib/ai/prompts/quiz-generation";
 import type { ExtractedArgument } from "@/lib/ai/prompts/argument-extraction";
-import { readFile } from "fs/promises";
-import path from "path";
+import { downloadFile } from "@/lib/storage/supabase";
 import { createHash } from "crypto";
 
 type ProcessingStatus =
@@ -112,8 +111,7 @@ export async function processContent(
         const result = await extractText("url", content.sourceUrl);
         rawText = result.text;
       } else if (content.filePath) {
-        const filePath = path.join(process.cwd(), content.filePath);
-        const buffer = await readFile(filePath);
+        const buffer = await downloadFile(content.filePath);
         const result = await extractText(
           content.sourceType as "pdf" | "docx" | "epub",
           buffer
