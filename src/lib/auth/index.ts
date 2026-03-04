@@ -12,6 +12,7 @@ import { seedSampleContentForUser } from "@/lib/db/seed-sample-content";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  trustHost: true,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,

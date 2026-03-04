@@ -7,11 +7,18 @@ interface Question {
   id: string;
   questionType: string;
   questionText: string;
-  options: string[] | null;
+  options: string[] | string | null;
   difficultyLevel: number | null;
   bloomsLevel: string | null;
   points: number | null;
   timeLimitSeconds: number | null;
+}
+
+/** Safely parse options — handles both array and double-serialized JSON string */
+function parseOptions(options: string[] | string | null): string[] {
+  if (!options) return [];
+  if (Array.isArray(options)) return options;
+  try { return JSON.parse(options); } catch { return []; }
 }
 
 export function QuestionRenderer({
@@ -39,12 +46,13 @@ export function QuestionRenderer({
 
       // MCQ: A/B/C/D or 1/2/3/4
       if (question.questionType === "mcq" && question.options) {
+        const opts = parseOptions(question.options);
         const letterIndex = "ABCD".indexOf(key);
         const numberIndex = "1234".indexOf(e.key);
         const idx = letterIndex >= 0 ? letterIndex : numberIndex;
-        if (idx >= 0 && idx < question.options.length) {
+        if (idx >= 0 && idx < opts.length) {
           e.preventDefault();
-          onAnswer(question.options[idx]);
+          onAnswer(opts[idx]);
         }
       }
 
@@ -79,7 +87,7 @@ export function QuestionRenderer({
       {/* Answer area by type */}
       {(question.questionType === "mcq" && question.options) && (
         <div className="space-y-2">
-          {(question.options as string[]).map((option, i) => (
+          {parseOptions(question.options).map((option, i) => (
             <button
               key={i}
               onClick={() => onAnswer(option)}
