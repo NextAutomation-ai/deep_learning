@@ -14,7 +14,7 @@ export async function POST(
   try {
     const session = await getUser();
     const { contentId } = await params;
-    if (!verifyContentOwnership(contentId, session.user.id)) {
+    if (!(await verifyContentOwnership(contentId, session.user.id))) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const body = await request.json();
@@ -31,22 +31,20 @@ export async function POST(
     }
 
     // Load chunks for context (first 5 for token budget)
-    const chunks = db
+    const chunks = await db
       .select()
       .from(contentChunks)
-      .where(eq(contentChunks.contentId, contentId))
-      .all();
+      .where(eq(contentChunks.contentId, contentId));
 
     const sourceContext = chunks
       .slice(0, 5)
       .map((c) => c.text)
       .join("\n\n");
 
-    const allConcepts = db
+    const allConcepts = await db
       .select()
       .from(concepts)
-      .where(eq(concepts.contentId, contentId))
-      .all();
+      .where(eq(concepts.contentId, contentId));
 
     const messages = buildWhatIfPrompt(
       scenario,

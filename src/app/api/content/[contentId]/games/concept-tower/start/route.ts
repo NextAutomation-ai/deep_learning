@@ -24,15 +24,14 @@ export async function POST(
   const session = await getUser();
   const { contentId } = await params;
 
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!(await verifyContentOwnership(contentId, session.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const allConcepts = db
+  const allConcepts = await db
     .select()
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all();
+    .where(eq(concepts.contentId, contentId));
 
   if (allConcepts.length < 5) {
     return NextResponse.json(

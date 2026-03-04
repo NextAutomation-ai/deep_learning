@@ -13,31 +13,28 @@ export default async function ContentDetailPage({
   const session = await getUser();
   const { contentId } = await params;
 
-  const content = db
+  const [content] = await db
     .select()
     .from(contents)
     .where(and(eq(contents.id, contentId), eq(contents.userId, session.user.id)))
-    .get();
+    .limit(1);
 
   if (!content) redirect("/library");
 
-  const conceptCount = db
+  const conceptCount = (await db
     .select()
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all().length;
+    .where(eq(concepts.contentId, contentId))).length;
 
-  const questionCount = db
+  const questionCount = (await db
     .select()
     .from(questions)
-    .where(eq(questions.contentId, contentId))
-    .all().length;
+    .where(eq(questions.contentId, contentId))).length;
 
-  const flashcardCount = db
+  const flashcardCount = (await db
     .select()
     .from(flashcards)
-    .where(eq(flashcards.contentId, contentId))
-    .all().length;
+    .where(eq(flashcards.contentId, contentId))).length;
 
   return (
     <ContentTabs

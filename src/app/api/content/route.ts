@@ -65,19 +65,19 @@ export async function GET(request: NextRequest) {
             ? desc(contents.totalConcepts)
             : desc(contents.createdAt);
 
-  const userContents = db
+  const userContents = await db
     .select()
     .from(contents)
     .where(and(...conditions))
-    .orderBy(orderBy)
-    .all();
+    .orderBy(orderBy);
 
   // Get total count (unfiltered) for UI
-  const totalCount = db
+  const totalCountResult = (await db
     .select({ count: sql<number>`count(*)` })
     .from(contents)
     .where(eq(contents.userId, session.user.id))
-    .get()?.count ?? 0;
+    .limit(1))[0];
+  const totalCount = totalCountResult?.count ?? 0;
 
   return NextResponse.json({ contents: userContents, totalCount });
 }

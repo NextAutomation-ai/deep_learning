@@ -68,21 +68,20 @@ async function processInBatches<T, R>(
   return results;
 }
 
-function updateStatus(
+async function updateStatus(
   contentId: string,
   status: ProcessingStatus,
   progress: number,
   emitter?: StatusEmitter,
   message?: string
 ) {
-  db.update(contents)
+  await db.update(contents)
     .set({
       processingStatus: status,
       processingProgress: progress,
       updatedAt: new Date(),
     })
-    .where(eq(contents.id, contentId))
-    .run();
+    .where(eq(contents.id, contentId));
 
   emitter?.emit({ status, progress, message: message || status });
 }
@@ -93,16 +92,16 @@ export async function processContent(
 ): Promise<void> {
   try {
     // Fetch content record
-    const content = db
+    const [content] = await db
       .select()
       .from(contents)
       .where(eq(contents.id, contentId))
-      .get();
+      .limit(1);
 
     if (!content) throw new Error("Content not found");
 
     // ---- STEP 1: Extract Text ----
-    updateStatus(contentId, "extracting", 5, emitter, "Extracting text from source...");
+    await updateStatus(contentId, "extracting", 5, emitter, "Extracting text from source...");
 
     let rawText = content.rawText;
     if (!rawText) {
@@ -123,10 +122,9 @@ export async function processContent(
       }
 
       if (rawText) {
-        db.update(contents)
+        await db.update(contents)
           .set({ rawText })
-          .where(eq(contents.id, contentId))
-          .run();
+          .where(eq(contents.id, contentId));
       }
     }
 
@@ -135,19 +133,18 @@ export async function processContent(
     }
 
     const contentHash = createHash("sha256").update(rawText).digest("hex");
-    db.update(contents)
+    await db.update(contents)
       .set({ contentHash })
-      .where(eq(contents.id, contentId))
-      .run();
+      .where(eq(contents.id, contentId));
 
     // ---- STEP 2: Chunk Text ----
-    updateStatus(contentId, "chunking", 15, emitter, "Splitting content into chunks...");
+    await updateStatus(contentId, "chunking", 15, emitter, "Splitting content into chunks...");
 
     const chunks = chunkText(rawText);
     const chunkRecords: { id: string; text: string; index: number }[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
-      const result = db
+      const [result] = await db
         .insert(contentChunks)
         .values({
           contentId,
@@ -155,18 +152,16 @@ export async function processContent(
           text: chunks[i],
           tokenCount: estimateTokens(chunks[i]),
         })
-        .returning()
-        .get();
+        .returning();
       chunkRecords.push({ id: result.id, text: chunks[i], index: i });
     }
 
-    db.update(contents)
+    await db.update(contents)
       .set({ totalChunks: chunks.length })
-      .where(eq(contents.id, contentId))
-      .run();
+      .where(eq(contents.id, contentId));
 
     // ---- STEP 3: Extract Concepts (parallel batches) ----
-    updateStatus(contentId, "analyzing", 25, emitter, "Identifying key concepts...");
+    await updateStatus(contentId, "analyzing", 25, emitter, "Identifying key concepts...");
 
     const allConcepts: (ExtractedConcept & { chunkId: string })[] = [];
     const maxChunksToProcess = Math.min(chunks.length, 50);
@@ -213,7 +208,7 @@ export async function processContent(
     const insertedConcepts: { id: string; name: string }[] = [];
     for (const c of uniqueConcepts) {
       try {
-        const result = db
+        const [result] = await db
           .insert(concepts)
           .values({
             contentId: contentId,
@@ -233,21 +228,19 @@ export async function processContent(
             tags: c.tags || [],
             importanceScore: c.importance_score || 0.5,
           })
-          .returning()
-          .get();
+          .returning();
         insertedConcepts.push({ id: result.id, name: result.name });
       } catch (err) {
         console.error(`Failed to insert concept ${c.name}:`, err);
       }
     }
 
-    db.update(contents)
+    await db.update(contents)
       .set({ totalConcepts: insertedConcepts.length })
-      .where(eq(contents.id, contentId))
-      .run();
+      .where(eq(contents.id, contentId));
 
     // ---- STEP 4: Map Relationships ----
-    updateStatus(
+    await updateStatus(
       contentId,
       "analyzing",
       55,
@@ -284,7 +277,7 @@ export async function processContent(
               const targetId = conceptIdLookup.get(rel.target?.toLowerCase());
               if (sourceId && targetId && sourceId !== targetId) {
                 try {
-                  db.insert(conceptRelationships)
+                  await db.insert(conceptRelationships)
                     .values({
                       contentId,
                       sourceConceptId: sourceId,
@@ -294,8 +287,7 @@ export async function processContent(
                         : "related",
                       strength: rel.strength || 0.5,
                       description: rel.description,
-                    })
-                    .run();
+                    });
                 } catch {
                   // Skip duplicate relationships
                 }
@@ -309,7 +301,7 @@ export async function processContent(
     }
 
     // ---- STEP 5: Extract Arguments (parallel batches) ----
-    updateStatus(contentId, "analyzing", 60, emitter, "Extracting arguments...");
+    await updateStatus(contentId, "analyzing", 60, emitter, "Extracting arguments...");
 
     const argumentChunks = chunkRecords.slice(0, Math.min(maxChunksToProcess, 20));
     await processInBatches(
@@ -327,7 +319,7 @@ export async function processContent(
         );
         if (parsed?.arguments) {
           for (const arg of parsed.arguments) {
-            db.insert(arguments_)
+            await db.insert(arguments_)
               .values({
                 contentId,
                 chunkId: chunkRecord.id,
@@ -340,8 +332,7 @@ export async function processContent(
                 fallacies: arg.fallacies || [],
                 strengthScore: arg.strength_score || 0.5,
                 counterArguments: arg.counter_arguments || [],
-              })
-              .run();
+              });
           }
         }
         return null;
@@ -353,7 +344,7 @@ export async function processContent(
     );
 
     // ---- STEP 6: Generate Quizzes (all difficulties in parallel) ----
-    updateStatus(contentId, "generating", 75, emitter, "Generating quiz questions...");
+    await updateStatus(contentId, "generating", 75, emitter, "Generating quiz questions...");
 
     const conceptsForQuiz = uniqueConcepts.slice(0, 15).map((c) => ({
       name: c.name,
@@ -387,7 +378,7 @@ export async function processContent(
                 ? conceptIdLookup.get(q.related_concept.toLowerCase()) || null
                 : null;
 
-              db.insert(questions)
+              await db.insert(questions)
                 .values({
                   contentId,
                   conceptId,
@@ -404,8 +395,7 @@ export async function processContent(
                     : "remember") as "remember",
                   points: q.points || 10,
                   timeLimitSeconds: q.time_limit_seconds || 60,
-                })
-                .run();
+                });
             }
           }
         } catch (err) {
@@ -415,7 +405,7 @@ export async function processContent(
     );
 
     // ---- STEP 7: Generate Flashcards ----
-    updateStatus(contentId, "generating", 85, emitter, "Creating flashcards...");
+    await updateStatus(contentId, "generating", 85, emitter, "Creating flashcards...");
 
     try {
       const conceptsForFlashcards = uniqueConcepts.slice(0, 30).map((c) => ({
@@ -436,15 +426,14 @@ export async function processContent(
       if (parsed?.flashcards) {
         for (const fc of parsed.flashcards) {
           const conceptId = findMatchingConcept(fc.front_text, conceptIdLookup);
-          db.insert(flashcards)
+          await db.insert(flashcards)
             .values({
               contentId,
               conceptId,
               frontText: fc.front_text,
               backText: fc.back_text,
               difficultyLevel: fc.difficulty_level || 1,
-            })
-            .run();
+            });
         }
       }
     } catch (err) {
@@ -452,18 +441,17 @@ export async function processContent(
     }
 
     // ---- DONE ----
-    updateStatus(contentId, "completed", 100, emitter, "Processing complete!");
+    await updateStatus(contentId, "completed", 100, emitter, "Processing complete!");
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    db.update(contents)
+    await db.update(contents)
       .set({
         processingStatus: "failed",
         processingError: errorMessage,
         updatedAt: new Date(),
       })
-      .where(eq(contents.id, contentId))
-      .run();
+      .where(eq(contents.id, contentId));
 
     emitter?.emit({ status: "failed", progress: 0, message: errorMessage });
     throw error;

@@ -8,29 +8,27 @@ export async function GET() {
   const session = await getUser();
 
   // Get all content IDs for user
-  const userContentIds = db
+  const userContentRows = await db
     .select({ id: contents.id })
     .from(contents)
-    .where(eq(contents.userId, session.user.id))
-    .all()
-    .map((c) => c.id);
+    .where(eq(contents.userId, session.user.id));
+  const userContentIds = userContentRows.map((c) => c.id);
 
   if (userContentIds.length === 0) {
     return NextResponse.json({ dueCount: 0, totalCount: 0 });
   }
 
   // Get all flashcards for user's content
-  const allFlashcards = db.select().from(flashcards).all();
+  const allFlashcards = await db.select().from(flashcards);
   const userFlashcards = allFlashcards.filter((f) =>
     userContentIds.includes(f.contentId)
   );
 
   // Get all progress rows for user
-  const progressRows = db
+  const progressRows = await db
     .select()
     .from(userProgress)
-    .where(eq(userProgress.userId, session.user.id))
-    .all();
+    .where(eq(userProgress.userId, session.user.id));
 
   const progressMap = new Map(
     progressRows.map((p) => [p.conceptId, p])

@@ -2,29 +2,30 @@ import { NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { learningSessions, userStats } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { getNextMilestone } from "@/lib/gamification/streak";
 
 export async function GET() {
   const session = await getUser();
 
-  const stats = db
+  const stats = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === session.user.id);
+    .where(eq(userStats.userId, session.user.id))
+    .limit(1))[0];
 
   // Get last 90 days of sessions for heatmap
   const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-  const sessions = db
+  const allSessions = await db
     .select()
     .from(learningSessions)
-    .all()
-    .filter(
-      (s) =>
-        s.userId === session.user.id &&
-        s.startedAt &&
-        s.startedAt.getTime() > ninetyDaysAgo
-    );
+    .where(eq(learningSessions.userId, session.user.id));
+
+  const sessions = allSessions.filter(
+    (s) =>
+      s.startedAt &&
+      s.startedAt.getTime() > ninetyDaysAgo
+  );
 
   // Build heatmap data: { date: "YYYY-MM-DD", count: number, xp: number }
   const heatmap: Record<string, { count: number; xp: number }> = {};

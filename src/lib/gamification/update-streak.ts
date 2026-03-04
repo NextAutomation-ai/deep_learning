@@ -10,12 +10,12 @@ import { checkBadges, awardBadges } from "./badge-engine";
  * - Older or null: reset streak to 1
  * Also updates longestStreak and fires streak badge checks.
  */
-export function updateStreak(userId: string): void {
-  const stats = db
+export async function updateStreak(userId: string): Promise<void> {
+  const [stats] = await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1);
 
   if (!stats) return;
 
@@ -49,17 +49,16 @@ export function updateStreak(userId: string): void {
 
   const newLongest = Math.max(stats.longestStreak ?? 0, newStreak);
 
-  db.update(userStats)
+  await db.update(userStats)
     .set({
       currentStreak: newStreak,
       longestStreak: newLongest,
       lastActivityDate: today,
       updatedAt: new Date(),
     })
-    .where(eq(userStats.id, stats.id))
-    .run();
+    .where(eq(userStats.id, stats.id));
 
   // Check for streak milestone badges
-  const newBadges = checkBadges(userId, "streak_updated");
-  awardBadges(userId, newBadges);
+  const newBadges = await checkBadges(userId, "streak_updated");
+  await awardBadges(userId, newBadges);
 }

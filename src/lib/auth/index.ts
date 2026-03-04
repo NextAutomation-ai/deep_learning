@@ -25,9 +25,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     updateAge: 24 * 60 * 60,   // refresh session every 24h
   },
   events: {
-    createUser({ user }) {
+    async createUser({ user }) {
       if (user.id) {
-        seedSampleContentForUser(user.id);
+        await seedSampleContentForUser(user.id);
       }
     },
   },

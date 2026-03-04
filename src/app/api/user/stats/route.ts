@@ -8,15 +8,15 @@ import { getLevelInfo } from "@/lib/learning/xp";
 export async function GET() {
   const session = await getUser();
 
-  let stats = db
+  let stats = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === session.user.id);
+    .where(eq(userStats.userId, session.user.id))
+    .limit(1))[0];
 
   if (!stats) {
     // Create default stats
-    stats = db
+    stats = (await db
       .insert(userStats)
       .values({
         userId: session.user.id,
@@ -30,16 +30,14 @@ export async function GET() {
         badges: [],
         achievements: [],
       })
-      .returning()
-      .get();
+      .returning())[0];
   }
 
   // Count mastered concepts (mastery >= 0.8)
-  const progressRows = db
+  const progressRows = await db
     .select()
     .from(userProgress)
-    .all()
-    .filter((p) => p.userId === session.user.id);
+    .where(eq(userProgress.userId, session.user.id));
 
   const conceptsMastered = progressRows.filter(
     (p) => (p.masteryLevel ?? 0) >= 0.8
@@ -47,10 +45,9 @@ export async function GET() {
 
   // Update mastered count if changed
   if (conceptsMastered !== stats.totalConceptsMastered) {
-    db.update(userStats)
+    await db.update(userStats)
       .set({ totalConceptsMastered: conceptsMastered })
-      .where(eq(userStats.id, stats.id))
-      .run();
+      .where(eq(userStats.id, stats.id));
     stats = { ...stats, totalConceptsMastered: conceptsMastered };
   }
 

@@ -7,7 +7,7 @@ import {
   learningSessions,
   userStats,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { aiCompleteJson } from "@/lib/ai/router";
 import {
   buildBiasDetectionPrompt,
@@ -35,11 +35,11 @@ export async function POST(
     let selectedChunkId: string | null = null;
 
     if (chunkId) {
-      const chunk = db
+      const chunk = (await db
         .select()
         .from(contentChunks)
         .where(eq(contentChunks.id, chunkId))
-        .get();
+        .limit(1))[0];
       if (!chunk) {
         return NextResponse.json({ error: "Chunk not found" }, { status: 404 });
       }
@@ -47,12 +47,15 @@ export async function POST(
       selectedChunkId = chunk.id;
     } else {
       // Pick a random chunk with substantial text
-      const chunks = db
+      const chunks = (await db
         .select()
         .from(contentChunks)
-        .where(eq(contentChunks.contentId, contentId))
-        .all()
-        .filter((c) => c.text.length > 200);
+        .where(
+          and(
+            eq(contentChunks.contentId, contentId),
+            gt(sql`length(${contentChunks.text})`, 200)
+          )
+        ));
 
       if (chunks.length === 0) {
         return NextResponse.json(
@@ -80,7 +83,7 @@ export async function POST(
     });
 
     // Create exercise
-    const exercise = db
+    const [exercise] = await db
       .insert(biasDetectionExercises)
       .values({
         userId: session.user.id,
@@ -89,17 +92,15 @@ export async function POST(
         passage,
         guidedQuestions: result.questions,
       })
-      .returning()
-      .get();
+      .returning();
 
     // Create learning session
-    db.insert(learningSessions)
+    await db.insert(learningSessions)
       .values({
         userId: session.user.id,
         contentId,
         sessionType: "bias_detection",
-      })
-      .run();
+      });
 
     return NextResponse.json({
       exerciseId: exercise.id,
@@ -128,11 +129,11 @@ export async function PUT(
       responses: Array<{ question: string; answer: string }>;
     };
 
-    const exercise = db
+    const exercise = (await db
       .select()
       .from(biasDetectionExercises)
       .where(eq(biasDetectionExercises.id, exerciseId))
-      .get();
+      .limit(1))[0];
 
     if (!exercise) {
       return NextResponse.json({ error: "Exercise not found" }, { status: 404 });
@@ -155,7 +156,7 @@ export async function PUT(
     const xpEarned = Math.round(XP_REWARDS.bias_detection * overallScore);
 
     // Update exercise
-    db.update(biasDetectionExercises)
+    await db.update(biasDetectionExercises)
       .set({
         userResponses: responses,
         aiFeedback: evaluation.feedback,
@@ -166,16 +167,15 @@ export async function PUT(
         xpEarned,
         completedAt: new Date(),
       })
-      .where(eq(biasDetectionExercises.id, exerciseId))
-      .run();
+      .where(eq(biasDetectionExercises.id, exerciseId));
 
     // Award XP and update streak
-    updateUserStats(user.user.id, xpEarned);
-    updateStreak(user.user.id);
+    await updateUserStats(user.user.id, xpEarned);
+    await updateStreak(user.user.id);
 
     // Check thinking badges
-    const newBadges = checkBadges(user.user.id, "thinking_completed");
-    awardBadges(user.user.id, newBadges);
+    const newBadges = await checkBadges(user.user.id, "thinking_completed");
+    await awardBadges(user.user.id, newBadges);
 
     return NextResponse.json({
       scores: {
@@ -196,32 +196,30 @@ export async function PUT(
   }
 }
 
-function updateUserStats(userId: string, xpEarned: number) {
-  const existing = db
+async function updateUserStats(userId: string, xpEarned: number) {
+  const existing = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1))[0];
 
   if (existing) {
     const newXp = (existing.totalXp ?? 0) + xpEarned;
     const levelInfo = getLevelInfo(newXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, existing.id))
-      .run();
+      .where(eq(userStats.id, existing.id));
   } else {
     const levelInfo = getLevelInfo(xpEarned);
-    db.insert(userStats)
+    await db.insert(userStats)
       .values({
         userId,
         totalXp: xpEarned,
         level: levelInfo.level,
-      })
-      .run();
+      });
   }
 }

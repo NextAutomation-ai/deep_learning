@@ -21,11 +21,11 @@ export async function POST(
       );
     }
 
-    const concept = db
+    const concept = (await db
       .select()
       .from(concepts)
       .where(eq(concepts.id, conceptId))
-      .get();
+      .limit(1))[0];
 
     if (!concept) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -15,19 +15,18 @@ export default async function DashboardPage() {
   // For guests, always show fresh/zero stats
   const stats = isGuest
     ? null
-    : db
+    : (await db
         .select()
         .from(userStats)
-        .all()
-        .find((s) => s.userId === session.user.id);
+        .where(eq(userStats.userId, session.user.id))
+        .limit(1))[0] ?? null;
 
   const contentCount = isGuest
     ? 0
-    : db
+    : (await db
         .select()
         .from(contents)
-        .where(eq(contents.userId, session.user.id))
-        .all().length;
+        .where(eq(contents.userId, session.user.id))).length;
 
   const levelInfo = getLevelInfo(stats?.totalXp ?? 0);
 

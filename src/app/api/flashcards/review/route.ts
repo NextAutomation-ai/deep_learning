@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { userProgress, userStats } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { calculateSM2, defaultSM2State } from "@/lib/learning/sm2";
 import type { SM2Rating } from "@/lib/learning/sm2";
 import { getLevelInfo, XP_REWARDS } from "@/lib/learning/xp";
@@ -26,16 +26,17 @@ export async function POST(request: NextRequest) {
   }
 
   // Get or create user progress for this concept
-  const existing = db
+  const existing = (await db
     .select()
     .from(userProgress)
-    .all()
-    .find(
-      (p) =>
-        p.userId === session.user.id &&
-        p.contentId === contentId &&
-        p.conceptId === conceptId
-    );
+    .where(
+      and(
+        eq(userProgress.userId, session.user.id),
+        eq(userProgress.contentId, contentId),
+        eq(userProgress.conceptId, conceptId)
+      )
+    )
+    .limit(1))[0];
 
   const currentState = existing
     ? {
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
   const newMastery = timesCorrect / timesReviewed;
 
   if (existing) {
-    db.update(userProgress)
+    await db.update(userProgress)
       .set({
         easeFactor: result.easeFactor,
         intervalDays: result.intervalDays,
@@ -65,10 +66,9 @@ export async function POST(request: NextRequest) {
         timesIncorrect: (existing.timesIncorrect ?? 0) + (isCorrect ? 0 : 1),
         updatedAt: new Date(),
       })
-      .where(eq(userProgress.id, existing.id))
-      .run();
+      .where(eq(userProgress.id, existing.id));
   } else {
-    db.insert(userProgress)
+    await db.insert(userProgress)
       .values({
         userId: session.user.id,
         contentId,
@@ -82,14 +82,13 @@ export async function POST(request: NextRequest) {
         timesReviewed: 1,
         timesCorrect: isCorrect ? 1 : 0,
         timesIncorrect: isCorrect ? 0 : 1,
-      })
-      .run();
+      });
   }
 
   // Award XP for review
   const xp = XP_REWARDS.flashcard_review;
-  updateUserStats(session.user.id, xp);
-  updateStreak(session.user.id);
+  await updateUserStats(session.user.id, xp);
+  await updateStreak(session.user.id);
 
   return NextResponse.json({
     nextReviewAt: result.nextReviewAt,
@@ -100,31 +99,29 @@ export async function POST(request: NextRequest) {
   });
 }
 
-function updateUserStats(userId: string, xpEarned: number) {
-  const existing = db
+async function updateUserStats(userId: string, xpEarned: number) {
+  const existing = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1))[0];
 
   if (existing) {
     const newXp = (existing.totalXp ?? 0) + xpEarned;
     const levelInfo = getLevelInfo(newXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, existing.id))
-      .run();
+      .where(eq(userStats.id, existing.id));
   } else {
-    db.insert(userStats)
+    await db.insert(userStats)
       .values({
         userId,
         totalXp: xpEarned,
         level: 1,
-      })
-      .run();
+      });
   }
 }

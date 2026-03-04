@@ -12,22 +12,20 @@ export async function GET(
   const session = await getUser();
   const { contentId } = await params;
 
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!(await verifyContentOwnership(contentId, session.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const relationships = db
+  const relationships = await db
     .select()
     .from(conceptRelationships)
-    .where(eq(conceptRelationships.contentId, contentId))
-    .all();
+    .where(eq(conceptRelationships.contentId, contentId));
 
   // Get concept names for display
-  const allConcepts = db
+  const allConcepts = await db
     .select({ id: concepts.id, name: concepts.name })
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all();
+    .where(eq(concepts.contentId, contentId));
 
   const nameMap = new Map(allConcepts.map((c) => [c.id, c.name]));
 

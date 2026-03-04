@@ -21,15 +21,15 @@ export async function GET(
   const { contentId, debateId } = await params;
 
   const session = await getUser();
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!(await verifyContentOwnership(contentId, session.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const debate = db
+  const debate = (await db
     .select()
     .from(devilsAdvocateDebates)
     .where(eq(devilsAdvocateDebates.id, debateId))
-    .get();
+    .limit(1))[0];
 
   if (!debate) {
     return NextResponse.json({ error: "Debate not found" }, { status: 404 });
@@ -46,7 +46,7 @@ export async function POST(
     const user = await getUser();
     const { contentId, debateId } = await params;
 
-    if (!verifyContentOwnership(contentId, user.user.id)) {
+    if (!(await verifyContentOwnership(contentId, user.user.id))) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
@@ -56,11 +56,11 @@ export async function POST(
       action?: "complete";
     };
 
-    const debate = db
+    const debate = (await db
       .select()
       .from(devilsAdvocateDebates)
       .where(eq(devilsAdvocateDebates.id, debateId))
-      .get();
+      .limit(1))[0];
 
     if (!debate) {
       return NextResponse.json({ error: "Debate not found" }, { status: 404 });
@@ -91,7 +91,7 @@ export async function POST(
 
       const xpEarned = Math.round(XP_REWARDS.devils_advocate * overallScore);
 
-      db.update(devilsAdvocateDebates)
+      await db.update(devilsAdvocateDebates)
         .set({
           status: "completed",
           reasoningScore: evaluation.reasoning,
@@ -101,14 +101,13 @@ export async function POST(
           xpEarned,
           completedAt: new Date(),
         })
-        .where(eq(devilsAdvocateDebates.id, debateId))
-        .run();
+        .where(eq(devilsAdvocateDebates.id, debateId));
 
-      updateUserStats(user.user.id, xpEarned);
-      updateStreak(user.user.id);
+      await updateUserStats(user.user.id, xpEarned);
+      await updateStreak(user.user.id);
 
-      const newBadges = checkBadges(user.user.id, "thinking_completed");
-      awardBadges(user.user.id, newBadges);
+      const newBadges = await checkBadges(user.user.id, "thinking_completed");
+      await awardBadges(user.user.id, newBadges);
 
       return NextResponse.json({
         completed: true,
@@ -153,10 +152,9 @@ export async function POST(
       timestamp: Date.now(),
     });
 
-    db.update(devilsAdvocateDebates)
+    await db.update(devilsAdvocateDebates)
       .set({ messages: updatedMessages })
-      .where(eq(devilsAdvocateDebates.id, debateId))
-      .run();
+      .where(eq(devilsAdvocateDebates.id, debateId));
 
     return NextResponse.json({
       aiResponse,
@@ -170,32 +168,30 @@ export async function POST(
   }
 }
 
-function updateUserStats(userId: string, xpEarned: number) {
-  const existing = db
+async function updateUserStats(userId: string, xpEarned: number) {
+  const existing = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1))[0];
 
   if (existing) {
     const newXp = (existing.totalXp ?? 0) + xpEarned;
     const levelInfo = getLevelInfo(newXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, existing.id))
-      .run();
+      .where(eq(userStats.id, existing.id));
   } else {
     const levelInfo = getLevelInfo(xpEarned);
-    db.insert(userStats)
+    await db.insert(userStats)
       .values({
         userId,
         totalXp: xpEarned,
         level: levelInfo.level,
-      })
-      .run();
+      });
   }
 }

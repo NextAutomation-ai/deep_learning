@@ -37,7 +37,7 @@ export async function POST(
     const now = Date.now();
 
     // Create debate record
-    const debate = db
+    const [debate] = await db
       .insert(devilsAdvocateDebates)
       .values({
         userId: session.user.id,
@@ -50,17 +50,15 @@ export async function POST(
           { role: "ai" as const, content: aiCounterArgument, timestamp: now },
         ],
       })
-      .returning()
-      .get();
+      .returning();
 
     // Create learning session
-    db.insert(learningSessions)
+    await db.insert(learningSessions)
       .values({
         userId: session.user.id,
         contentId,
         sessionType: "devils_advocate",
-      })
-      .run();
+      });
 
     return NextResponse.json({
       debateId: debate.id,

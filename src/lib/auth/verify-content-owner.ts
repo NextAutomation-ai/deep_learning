@@ -6,12 +6,11 @@ import { eq, and } from "drizzle-orm";
  * Verifies the content belongs to the given user.
  * Returns the content row if owned, null otherwise.
  */
-export function verifyContentOwnership(contentId: string, userId: string) {
-  return (
-    db
-      .select()
-      .from(contents)
-      .where(and(eq(contents.id, contentId), eq(contents.userId, userId)))
-      .get() || null
-  );
+export async function verifyContentOwnership(contentId: string, userId: string) {
+  const [row] = await db
+    .select()
+    .from(contents)
+    .where(and(eq(contents.id, contentId), eq(contents.userId, userId)))
+    .limit(1);
+  return row || null;
 }

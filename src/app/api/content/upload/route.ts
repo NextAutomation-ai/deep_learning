@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const content = db
+  const content = (await db
     .insert(contents)
     .values({
       userId: session.user.id,
@@ -98,12 +98,11 @@ export async function POST(request: NextRequest) {
       rawText,
       processingStatus: "pending",
     })
-    .returning()
-    .get();
+    .returning())[0];
 
   // Check content upload badges
-  const newBadges = checkBadges(session.user.id, "content_uploaded");
-  awardBadges(session.user.id, newBadges);
+  const newBadges = await checkBadges(session.user.id, "content_uploaded");
+  await awardBadges(session.user.id, newBadges);
 
   return NextResponse.json({ content, newBadges }, { status: 201 });
 }

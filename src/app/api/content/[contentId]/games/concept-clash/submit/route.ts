@@ -26,18 +26,18 @@ export async function POST(
   const xpEarned = calculateGameXp("concept_clash", score, maxScore);
   const streakBonus = calculateStreakBonus(
     (
-      db
+      (await db
         .select()
         .from(userStats)
-        .all()
-        .find((s) => s.userId === session.user.id)
+        .where(eq(userStats.userId, session.user.id))
+        .limit(1))[0]
     )?.currentStreak ?? 0
   );
 
   const totalXp = xpEarned + streakBonus;
 
   // Record game session
-  db.insert(learningSessions)
+  await db.insert(learningSessions)
     .values({
       userId: session.user.id,
       contentId,
@@ -48,33 +48,31 @@ export async function POST(
         scorePercent: maxScore > 0 ? score / maxScore : 0,
         won: correct === total,
       } as unknown as string[],
-    })
-    .run();
+    });
 
   // Update user stats XP
-  const stats = db
+  const stats = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === session.user.id);
+    .where(eq(userStats.userId, session.user.id))
+    .limit(1))[0];
 
   if (stats) {
     const newTotalXp = (stats.totalXp ?? 0) + totalXp;
     const levelInfo = getLevelInfo(newTotalXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newTotalXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, stats.id))
-      .run();
+      .where(eq(userStats.id, stats.id));
   }
 
   // Update streak and check badges
-  updateStreak(session.user.id);
-  const newBadges = checkBadges(session.user.id, "game_completed");
-  awardBadges(session.user.id, newBadges);
+  await updateStreak(session.user.id);
+  const newBadges = await checkBadges(session.user.id, "game_completed");
+  await awardBadges(session.user.id, newBadges);
 
   return NextResponse.json({
     gameType: "concept_clash",

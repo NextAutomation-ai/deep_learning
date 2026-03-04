@@ -27,18 +27,18 @@ export async function POST(
     levelsCompleted,
     totalLevels
   );
-  const stats = db
+  const stats = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === session.user.id);
+    .where(eq(userStats.userId, session.user.id))
+    .limit(1))[0];
 
   const streakBonus = calculateStreakBonus(stats?.currentStreak ?? 0);
   const totalXp = xpEarned + streakBonus;
   const won = livesRemaining > 0 && levelsCompleted === totalLevels;
 
   // Record game session
-  db.insert(learningSessions)
+  await db.insert(learningSessions)
     .values({
       userId: session.user.id,
       contentId,
@@ -49,26 +49,24 @@ export async function POST(
         won,
         levelsCompleted,
       } as unknown as string[],
-    })
-    .run();
+    });
 
   // Update XP
   if (stats) {
     const newTotalXp = (stats.totalXp ?? 0) + totalXp;
     const levelInfo = getLevelInfo(newTotalXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newTotalXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, stats.id))
-      .run();
+      .where(eq(userStats.id, stats.id));
   }
 
-  updateStreak(session.user.id);
-  const newBadges = checkBadges(session.user.id, "game_completed");
-  awardBadges(session.user.id, newBadges);
+  await updateStreak(session.user.id);
+  const newBadges = await checkBadges(session.user.id, "game_completed");
+  await awardBadges(session.user.id, newBadges);
 
   return NextResponse.json({
     gameType: "concept_tower",

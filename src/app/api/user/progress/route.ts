@@ -9,24 +9,21 @@ export async function DELETE() {
   const userId = session.user.id;
 
   // Clear all progress rows
-  const result = db
+  await db
     .delete(userProgress)
-    .where(eq(userProgress.userId, userId))
-    .run();
+    .where(eq(userProgress.userId, userId));
 
   // Reset stats
-  db.update(userStats)
+  await db.update(userStats)
     .set({
       totalConceptsMastered: 0,
       totalQuizzesCompleted: 0,
       totalTimeSpentMinutes: 0,
       updatedAt: new Date(),
     })
-    .where(eq(userStats.userId, userId))
-    .run();
+    .where(eq(userStats.userId, userId));
 
   return NextResponse.json({
     success: true,
-    cleared: result.changes,
   });
 }

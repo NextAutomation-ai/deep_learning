@@ -14,32 +14,28 @@ export async function GET() {
   const session = await getUser();
   const userId = session.user.id;
 
-  const userContents = db
+  const userContents = await db
     .select()
     .from(contents)
-    .where(eq(contents.userId, userId))
-    .all();
+    .where(eq(contents.userId, userId));
 
-  const progress = db
+  const progress = await db
     .select()
     .from(userProgress)
-    .where(eq(userProgress.userId, userId))
-    .all();
+    .where(eq(userProgress.userId, userId));
 
-  const quizzes = db
+  const quizzes = await db
     .select()
     .from(quizAttempts)
-    .where(eq(quizAttempts.userId, userId))
-    .all();
+    .where(eq(quizAttempts.userId, userId));
 
-  const stats = db
+  const stats = await db
     .select()
     .from(userStats)
-    .where(eq(userStats.userId, userId))
-    .all();
+    .where(eq(userStats.userId, userId));
 
   const contentIds = userContents.map((c) => c.id);
-  const allFlashcards = db.select().from(flashcards).all();
+  const allFlashcards = await db.select().from(flashcards);
   const userFlashcards = allFlashcards.filter((f) =>
     contentIds.includes(f.contentId)
   );

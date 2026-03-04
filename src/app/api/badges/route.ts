@@ -3,15 +3,16 @@ import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { userStats } from "@/lib/db/schema";
 import { BADGES, BADGE_MAP } from "@/lib/gamification/badges";
+import { eq } from "drizzle-orm";
 
 export async function GET() {
   const session = await getUser();
 
-  const stats = db
+  const stats = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === session.user.id);
+    .where(eq(userStats.userId, session.user.id))
+    .limit(1))[0];
 
   const earnedIds = (stats?.badges as string[]) || [];
 

@@ -12,35 +12,32 @@ export async function GET(
 
   const { contentId } = await params;
 
-  const content = db
+  const content = (await db
     .select()
     .from(contents)
     .where(
       and(eq(contents.id, contentId), eq(contents.userId, session.user.id))
     )
-    .get();
+    .limit(1))[0];
 
   if (!content) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const conceptCount = db
+  const conceptCount = (await db
     .select()
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all().length;
+    .where(eq(concepts.contentId, contentId))).length;
 
-  const questionCount = db
+  const questionCount = (await db
     .select()
     .from(questions)
-    .where(eq(questions.contentId, contentId))
-    .all().length;
+    .where(eq(questions.contentId, contentId))).length;
 
-  const flashcardCount = db
+  const flashcardCount = (await db
     .select()
     .from(flashcards)
-    .where(eq(flashcards.contentId, contentId))
-    .all().length;
+    .where(eq(flashcards.contentId, contentId))).length;
 
   return NextResponse.json({
     content,
@@ -60,25 +57,25 @@ export async function DELETE(
 
   const { contentId } = await params;
 
-  const content = db
+  const content = (await db
     .select()
     .from(contents)
     .where(
       and(eq(contents.id, contentId), eq(contents.userId, session.user.id))
     )
-    .get();
+    .limit(1))[0];
 
   if (!content) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // Delete from tables without cascade before deleting content
-  db.delete(userProgress).where(eq(userProgress.contentId, contentId)).run();
-  db.delete(quizAttempts).where(eq(quizAttempts.contentId, contentId)).run();
-  db.delete(learningSessions).where(eq(learningSessions.contentId, contentId)).run();
+  await db.delete(userProgress).where(eq(userProgress.contentId, contentId));
+  await db.delete(quizAttempts).where(eq(quizAttempts.contentId, contentId));
+  await db.delete(learningSessions).where(eq(learningSessions.contentId, contentId));
 
   // CASCADE delete handles remaining related records (chunks, concepts, questions, flashcards, etc.)
-  db.delete(contents).where(eq(contents.id, contentId)).run();
+  await db.delete(contents).where(eq(contents.id, contentId));
 
   return NextResponse.json({ success: true });
 }

@@ -19,13 +19,12 @@ export async function POST(
     // Get concept — either specified or random from content
     let concept;
     if (conceptId) {
-      concept = db.select().from(concepts).where(eq(concepts.id, conceptId)).get();
+      concept = (await db.select().from(concepts).where(eq(concepts.id, conceptId)).limit(1))[0];
     } else {
-      const allConcepts = db
+      const allConcepts = await db
         .select()
         .from(concepts)
-        .where(eq(concepts.contentId, contentId))
-        .all();
+        .where(eq(concepts.contentId, contentId));
       if (allConcepts.length === 0) {
         return NextResponse.json({ error: "No concepts found" }, { status: 404 });
       }
@@ -53,7 +52,7 @@ export async function POST(
     const now = Date.now();
 
     // Create session
-    const sessionRow = db
+    const [sessionRow] = await db
       .insert(socraticSessions)
       .values({
         userId: session.user.id,
@@ -63,18 +62,16 @@ export async function POST(
         messages: [{ role: "ai" as const, content: firstQuestion, timestamp: now }],
         questionsAsked: 1,
       })
-      .returning()
-      .get();
+      .returning();
 
     // Create learning session
-    db.insert(learningSessions)
+    await db.insert(learningSessions)
       .values({
         userId: session.user.id,
         contentId,
         sessionType: "socratic",
         conceptsCovered: [concept.id],
-      })
-      .run();
+      });
 
     return NextResponse.json({
       sessionId: sessionRow.id,

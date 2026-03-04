@@ -13,18 +13,17 @@ export async function POST(
 ) {
   const session = await getUser();
   const { contentId } = await params;
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!await verifyContentOwnership(contentId, session.user.id)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const body = await request.json();
   const mode: QuizMode = body.mode || "standard";
 
   // Get all questions for this content
-  const allQuestions = db
+  const allQuestions = await db
     .select()
     .from(questions)
-    .where(eq(questions.contentId, contentId))
-    .all();
+    .where(eq(questions.contentId, contentId));
 
   if (allQuestions.length === 0) {
     return NextResponse.json(

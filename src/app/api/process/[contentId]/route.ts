@@ -25,13 +25,13 @@ export async function POST(
   const forceReprocess = (body as { force?: boolean }).force === true;
 
   // Verify ownership
-  const content = db
+  const content = (await db
     .select()
     .from(contents)
     .where(
       and(eq(contents.id, contentId), eq(contents.userId, session.user.id))
     )
-    .get();
+    .limit(1))[0];
 
   if (!content) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -50,18 +50,16 @@ export async function POST(
     content.processingStatus === "completed" ||
     content.processingStatus === "failed"
   ) {
-    db.delete(flashcards).where(eq(flashcards.contentId, contentId)).run();
-    db.delete(questions).where(eq(questions.contentId, contentId)).run();
-    db.delete(arguments_).where(eq(arguments_.contentId, contentId)).run();
-    db.delete(conceptRelationships)
-      .where(eq(conceptRelationships.contentId, contentId))
-      .run();
-    db.delete(concepts).where(eq(concepts.contentId, contentId)).run();
-    db.delete(contentChunks)
-      .where(eq(contentChunks.contentId, contentId))
-      .run();
+    await db.delete(flashcards).where(eq(flashcards.contentId, contentId));
+    await db.delete(questions).where(eq(questions.contentId, contentId));
+    await db.delete(arguments_).where(eq(arguments_.contentId, contentId));
+    await db.delete(conceptRelationships)
+      .where(eq(conceptRelationships.contentId, contentId));
+    await db.delete(concepts).where(eq(concepts.contentId, contentId));
+    await db.delete(contentChunks)
+      .where(eq(contentChunks.contentId, contentId));
 
-    db.update(contents)
+    await db.update(contents)
       .set({
         processingStatus: "pending",
         processingProgress: 0,
@@ -70,8 +68,7 @@ export async function POST(
         totalConcepts: 0,
         rawText: content.sourceType === "text" ? content.rawText : null,
       })
-      .where(eq(contents.id, contentId))
-      .run();
+      .where(eq(contents.id, contentId));
   }
 
   const emitter = processingStatus.createEmitter(contentId);

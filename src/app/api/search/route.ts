@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const pattern = `%${q}%`;
 
   // Search contents (title, description) — only completed
-  const matchedContents = db
+  const matchedContents = await db
     .select({
       id: contents.id,
       title: contents.title,
@@ -31,16 +31,14 @@ export async function GET(request: NextRequest) {
       )
     )
     .orderBy(desc(contents.updatedAt))
-    .limit(5)
-    .all();
+    .limit(5);
 
   // Get user's content IDs for scoping concept/flashcard searches
-  const userContentIds = db
+  const userContentRows = await db
     .select({ id: contents.id })
     .from(contents)
-    .where(eq(contents.userId, session.user.id))
-    .all()
-    .map((c) => c.id);
+    .where(eq(contents.userId, session.user.id));
+  const userContentIds = userContentRows.map((c) => c.id);
 
   if (userContentIds.length === 0) {
     return NextResponse.json({
@@ -51,7 +49,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Search concepts (name, definition)
-  const allConcepts = db
+  const allConcepts = await db
     .select({
       id: concepts.id,
       contentId: concepts.contentId,
@@ -60,15 +58,14 @@ export async function GET(request: NextRequest) {
     })
     .from(concepts)
     .where(or(like(concepts.name, pattern), like(concepts.definition, pattern)))
-    .limit(50)
-    .all();
+    .limit(50);
 
   const matchedConcepts = allConcepts
     .filter((c) => userContentIds.includes(c.contentId))
     .slice(0, 5);
 
   // Search flashcards (frontText)
-  const allFlashcards = db
+  const allFlashcards = await db
     .select({
       id: flashcards.id,
       contentId: flashcards.contentId,
@@ -76,8 +73,7 @@ export async function GET(request: NextRequest) {
     })
     .from(flashcards)
     .where(like(flashcards.frontText, pattern))
-    .limit(50)
-    .all();
+    .limit(50);
 
   const matchedFlashcards = allFlashcards
     .filter((f) => userContentIds.includes(f.contentId))

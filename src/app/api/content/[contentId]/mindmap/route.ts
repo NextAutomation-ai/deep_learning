@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { concepts, conceptRelationships, userProgress } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -11,24 +11,25 @@ export async function GET(
   const session = await getUser();
   const { contentId } = await params;
 
-  const allConcepts = db
+  const allConcepts = await db
     .select()
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all();
+    .where(eq(concepts.contentId, contentId));
 
-  const relationships = db
+  const relationships = await db
     .select()
     .from(conceptRelationships)
-    .where(eq(conceptRelationships.contentId, contentId))
-    .all();
+    .where(eq(conceptRelationships.contentId, contentId));
 
-  const progressRows = db
+  const progressRows = await db
     .select()
     .from(userProgress)
-    .where(eq(userProgress.contentId, contentId))
-    .all()
-    .filter((p) => p.userId === session.user.id);
+    .where(
+      and(
+        eq(userProgress.contentId, contentId),
+        eq(userProgress.userId, session.user.id)
+      )
+    );
 
   const progressMap = new Map(progressRows.map((p) => [p.conceptId, p]));
 

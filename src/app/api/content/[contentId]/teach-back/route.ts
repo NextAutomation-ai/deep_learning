@@ -37,11 +37,11 @@ export async function POST(
       );
     }
 
-    const concept = db
+    const concept = (await db
       .select()
       .from(concepts)
       .where(eq(concepts.id, conceptId))
-      .get();
+      .limit(1))[0];
 
     if (!concept) {
       return NextResponse.json({ error: "Concept not found" }, { status: 404 });
@@ -71,7 +71,7 @@ export async function POST(
     const xpEarned = Math.round(XP_REWARDS.teach_back * overallScore);
 
     // Save response
-    db.insert(teachBackResponses)
+    await db.insert(teachBackResponses)
       .values({
         userId: session.user.id,
         conceptId,
@@ -81,27 +81,25 @@ export async function POST(
         completenessScore: evaluation.completenessScore,
         reasoningScore: evaluation.reasoningScore,
         criticalThinkingScore: evaluation.criticalThinkingScore,
-      })
-      .run();
+      });
 
     // Create learning session
-    db.insert(learningSessions)
+    await db.insert(learningSessions)
       .values({
         userId: session.user.id,
         contentId,
         sessionType: "teach_back",
         conceptsCovered: [conceptId],
         xpEarned,
-      })
-      .run();
+      });
 
     // Award XP and update streak
-    updateUserStats(session.user.id, xpEarned);
-    updateStreak(session.user.id);
+    await updateUserStats(session.user.id, xpEarned);
+    await updateStreak(session.user.id);
 
     // Check thinking badges
-    const newBadges = checkBadges(session.user.id, "thinking_completed");
-    awardBadges(session.user.id, newBadges);
+    const newBadges = await checkBadges(session.user.id, "thinking_completed");
+    await awardBadges(session.user.id, newBadges);
 
     return NextResponse.json({
       scores: {
@@ -123,32 +121,30 @@ export async function POST(
   }
 }
 
-function updateUserStats(userId: string, xpEarned: number) {
-  const existing = db
+async function updateUserStats(userId: string, xpEarned: number) {
+  const existing = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1))[0];
 
   if (existing) {
     const newXp = (existing.totalXp ?? 0) + xpEarned;
     const levelInfo = getLevelInfo(newXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, existing.id))
-      .run();
+      .where(eq(userStats.id, existing.id));
   } else {
     const levelInfo = getLevelInfo(xpEarned);
-    db.insert(userStats)
+    await db.insert(userStats)
       .values({
         userId,
         totalXp: xpEarned,
         level: levelInfo.level,
-      })
-      .run();
+      });
   }
 }

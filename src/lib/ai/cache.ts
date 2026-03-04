@@ -13,7 +13,7 @@ export async function getCachedResponse(
   promptHash: string
 ): Promise<unknown | null> {
   try {
-    const cached = db
+    const cached = await db
       .select()
       .from(aiCache)
       .where(
@@ -23,8 +23,7 @@ export async function getCachedResponse(
           eq(aiCache.promptHash, promptHash)
         )
       )
-      .limit(1)
-      .all();
+      .limit(1);
 
     if (cached.length > 0) {
       return cached[0].result;
@@ -43,7 +42,7 @@ export async function setCachedResponse(
   result: unknown
 ): Promise<void> {
   try {
-    db.insert(aiCache)
+    await db.insert(aiCache)
       .values({
         task,
         contentHash,
@@ -58,8 +57,7 @@ export async function setCachedResponse(
           result: result as Record<string, unknown>,
           createdAt: new Date(),
         },
-      })
-      .run();
+      });
   } catch {
     // Cache write failures are non-critical
   }

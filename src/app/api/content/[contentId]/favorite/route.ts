@@ -11,13 +11,13 @@ export async function PATCH(
   const session = await getUser();
   const { contentId } = await params;
 
-  const content = db
+  const content = (await db
     .select({ id: contents.id, isFavorited: contents.isFavorited })
     .from(contents)
     .where(
       and(eq(contents.id, contentId), eq(contents.userId, session.user.id))
     )
-    .get();
+    .limit(1))[0];
 
   if (!content) {
     return NextResponse.json({ error: "Content not found" }, { status: 404 });
@@ -25,10 +25,9 @@ export async function PATCH(
 
   const newValue = content.isFavorited ? 0 : 1;
 
-  db.update(contents)
+  await db.update(contents)
     .set({ isFavorited: newValue, updatedAt: new Date() })
-    .where(eq(contents.id, contentId))
-    .run();
+    .where(eq(contents.id, contentId));
 
   return NextResponse.json({ isFavorited: newValue });
 }

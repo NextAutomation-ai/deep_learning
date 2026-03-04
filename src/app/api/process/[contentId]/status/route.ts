@@ -14,11 +14,11 @@ export async function GET(
   const { contentId } = await params;
 
   // Check current status first
-  const content = db
+  const content = (await db
     .select()
     .from(contents)
     .where(eq(contents.id, contentId))
-    .get();
+    .limit(1))[0];
 
   const stream = new ReadableStream({
     start(controller) {

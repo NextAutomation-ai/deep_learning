@@ -13,31 +13,30 @@ import { eq } from "drizzle-orm";
  * Seed 2 sample topics (ML Textbook + Climate Change) for any user.
  * Skips if the user already has content.
  */
-export function seedSampleContentForUser(userId: string) {
-  const existing = db
+export async function seedSampleContentForUser(userId: string) {
+  const existing = await db
     .select()
     .from(contents)
-    .where(eq(contents.userId, userId))
-    .all();
+    .where(eq(contents.userId, userId));
   if (existing.length > 0) return;
 
   const p = userId === "default-user" ? "guest" : userId.slice(0, 8);
-  seedMLTextbook(userId, p);
-  seedClimateEducation(userId, p);
+  await seedMLTextbook(userId, p);
+  await seedClimateEducation(userId, p);
 }
 
 /** Convenience wrapper for guest user */
-export function seedGuestContent() {
-  seedSampleContentForUser("default-user");
+export async function seedGuestContent() {
+  await seedSampleContentForUser("default-user");
 }
 
 // ─── Topic 1: Introduction to Machine Learning (Textbook) ────
 
-function seedMLTextbook(userId: string, p: string) {
+async function seedMLTextbook(userId: string, p: string) {
   const contentId = `${p}-ml-textbook`;
   const now = new Date();
 
-  db.insert(contents)
+  await db.insert(contents)
     .values({
       id: contentId,
       userId,
@@ -50,8 +49,7 @@ function seedMLTextbook(userId: string, p: string) {
       rawText: "Introduction to Machine Learning by Alex Smola and S.V.N. Vishwanathan, Cambridge University Press.",
       createdAt: now,
       updatedAt: now,
-    })
-    .run();
+    });
 
   const chunkIds = [
     `${p}-mltb-chunk-1`,
@@ -60,7 +58,7 @@ function seedMLTextbook(userId: string, p: string) {
     `${p}-mltb-chunk-4`,
   ];
 
-  db.insert(contentChunks)
+  await db.insert(contentChunks)
     .values([
       {
         id: chunkIds[0],
@@ -90,8 +88,7 @@ function seedMLTextbook(userId: string, p: string) {
         chapterTitle: "Optimization and Density Estimation",
         text: "Optimization is central to machine learning — most algorithms work by minimizing a loss function. Gradient descent iteratively moves in the direction of steepest descent to find the minimum. Convex functions have the property that any local minimum is also a global minimum, making optimization tractable. Maximum Likelihood Estimation (MLE) finds parameters that maximize the probability of observing the training data. The bias-variance tradeoff describes the tension between a model's ability to fit training data (low bias) and generalize to new data (low variance). Stochastic gradient descent processes one sample at a time, making it efficient for large datasets.",
       },
-    ])
-    .run();
+    ]);
 
   const conceptIds = [
     `${p}-mltb-c1`,
@@ -104,7 +101,7 @@ function seedMLTextbook(userId: string, p: string) {
     `${p}-mltb-c8`,
   ];
 
-  db.insert(concepts)
+  await db.insert(concepts)
     .values([
       {
         id: conceptIds[0],
@@ -210,10 +207,9 @@ function seedMLTextbook(userId: string, p: string) {
         importanceScore: 0.9,
         createdAt: now,
       },
-    ])
-    .run();
+    ]);
 
-  db.insert(conceptRelationships)
+  await db.insert(conceptRelationships)
     .values([
       { contentId, sourceConceptId: conceptIds[1], targetConceptId: conceptIds[3], relationshipType: "prerequisite", strength: 0.9 },
       { contentId, sourceConceptId: conceptIds[2], targetConceptId: conceptIds[1], relationshipType: "related", strength: 0.8 },
@@ -221,10 +217,9 @@ function seedMLTextbook(userId: string, p: string) {
       { contentId, sourceConceptId: conceptIds[6], targetConceptId: conceptIds[7], relationshipType: "related", strength: 0.85 },
       { contentId, sourceConceptId: conceptIds[4], targetConceptId: conceptIds[6], relationshipType: "related", strength: 0.7 },
       { contentId, sourceConceptId: conceptIds[0], targetConceptId: conceptIds[3], relationshipType: "related", strength: 0.65 },
-    ])
-    .run();
+    ]);
 
-  db.insert(questions)
+  await db.insert(questions)
     .values([
       {
         contentId,
@@ -292,10 +287,9 @@ function seedMLTextbook(userId: string, p: string) {
         difficultyLevel: 3,
         bloomsLevel: "remember",
       },
-    ])
-    .run();
+    ]);
 
-  db.insert(flashcards)
+  await db.insert(flashcards)
     .values([
       { contentId, conceptId: conceptIds[1], frontText: "State Bayes Rule and explain each component.", backText: "P(Y|X) = P(X|Y) * P(Y) / P(X). P(Y) = prior belief, P(X|Y) = likelihood of evidence given hypothesis, P(X) = marginal probability of evidence, P(Y|X) = posterior (updated belief).", difficultyLevel: 3 },
       { contentId, conceptId: conceptIds[3], frontText: "What is the Naive Bayes classifier and why does it work?", backText: "Assumes features are conditionally independent given the class label. Despite this strong assumption rarely being true, it works well for text classification and spam filtering because the independence violations often cancel out.", difficultyLevel: 2 },
@@ -303,17 +297,16 @@ function seedMLTextbook(userId: string, p: string) {
       { contentId, conceptId: conceptIds[6], frontText: "What is Gradient Descent and what are its variants?", backText: "Iterative optimization that moves in the direction of steepest descent (negative gradient). Variants: Batch (uses all data), Mini-batch (uses subsets), Stochastic (SGD, uses one sample). Learning rate controls step size.", difficultyLevel: 3 },
       { contentId, conceptId: conceptIds[7], frontText: "Explain the Bias-Variance Tradeoff.", backText: "High bias = model too simple, underfits. High variance = model too complex, overfits. Total error = bias² + variance + irreducible noise. Goal: find the sweet spot. Use cross-validation to balance.", difficultyLevel: 3 },
       { contentId, conceptId: conceptIds[5], frontText: "How does the Perceptron algorithm learn?", backText: "Processes training examples one at a time. If a point is misclassified, update weight: w = w + y*x. Converges in finite steps if data is linearly separable. Building block of neural networks.", difficultyLevel: 3 },
-    ])
-    .run();
+    ]);
 }
 
 // ─── Topic 2: Climate Change Education (UNESCO/UNEP) ─────────
 
-function seedClimateEducation(userId: string, p: string) {
+async function seedClimateEducation(userId: string, p: string) {
   const contentId = `${p}-climate-edu`;
   const now = new Date();
 
-  db.insert(contents)
+  await db.insert(contents)
     .values({
       id: contentId,
       userId,
@@ -326,8 +319,7 @@ function seedClimateEducation(userId: string, p: string) {
       rawText: "Climate Change Starter's Guidebook. An issues guide for education planners and practitioners. UNESCO/UNEP 2011.",
       createdAt: now,
       updatedAt: now,
-    })
-    .run();
+    });
 
   const chunkIds = [
     `${p}-cedu-chunk-1`,
@@ -336,7 +328,7 @@ function seedClimateEducation(userId: string, p: string) {
     `${p}-cedu-chunk-4`,
   ];
 
-  db.insert(contentChunks)
+  await db.insert(contentChunks)
     .values([
       {
         id: chunkIds[0],
@@ -366,8 +358,7 @@ function seedClimateEducation(userId: string, p: string) {
         chapterTitle: "Education and Climate Change",
         text: "Education for Sustainable Development (ESD) takes climate change education beyond pure science to include social, economic, and ethical dimensions. Climate change education for mitigation focuses on changing behaviours — reducing energy consumption, sustainable transportation, and responsible consumption. Education for adaptation helps communities learn to deal with local changes — new farming techniques, water conservation, and disaster preparedness. Education for Disaster Risk Reduction prepares populations for extreme weather events through early warning systems, evacuation planning, and community resilience building.",
       },
-    ])
-    .run();
+    ]);
 
   const conceptIds = [
     `${p}-cedu-c1`,
@@ -380,7 +371,7 @@ function seedClimateEducation(userId: string, p: string) {
     `${p}-cedu-c8`,
   ];
 
-  db.insert(concepts)
+  await db.insert(concepts)
     .values([
       {
         id: conceptIds[0],
@@ -486,10 +477,9 @@ function seedClimateEducation(userId: string, p: string) {
         importanceScore: 0.85,
         createdAt: now,
       },
-    ])
-    .run();
+    ]);
 
-  db.insert(conceptRelationships)
+  await db.insert(conceptRelationships)
     .values([
       { contentId, sourceConceptId: conceptIds[1], targetConceptId: conceptIds[0], relationshipType: "related", strength: 0.8 },
       { contentId, sourceConceptId: conceptIds[1], targetConceptId: conceptIds[4], relationshipType: "related", strength: 0.9 },
@@ -498,10 +488,9 @@ function seedClimateEducation(userId: string, p: string) {
       { contentId, sourceConceptId: conceptIds[6], targetConceptId: conceptIds[4], relationshipType: "part_of", strength: 0.85 },
       { contentId, sourceConceptId: conceptIds[7], targetConceptId: conceptIds[4], relationshipType: "supports", strength: 0.8 },
       { contentId, sourceConceptId: conceptIds[7], targetConceptId: conceptIds[5], relationshipType: "supports", strength: 0.8 },
-    ])
-    .run();
+    ]);
 
-  db.insert(questions)
+  await db.insert(questions)
     .values([
       {
         contentId,
@@ -569,10 +558,9 @@ function seedClimateEducation(userId: string, p: string) {
         difficultyLevel: 2,
         bloomsLevel: "understand",
       },
-    ])
-    .run();
+    ]);
 
-  db.insert(flashcards)
+  await db.insert(flashcards)
     .values([
       { contentId, conceptId: conceptIds[0], frontText: "What is the difference between climate and weather?", backText: "Weather is the day-to-day atmospheric state (temperature, rain, wind). Climate is the average of weather conditions over ~30 years. Climate change refers to long-term shifts in these averages, not short-term weather variations.", difficultyLevel: 1 },
       { contentId, conceptId: conceptIds[1], frontText: "Name the three main greenhouse gases and their sources.", backText: "CO2 — fossil fuel burning, deforestation. CH4 (methane) — agriculture, livestock, waste. N2O (nitrous oxide) — fertilizers, industrial processes. All have increased since the Industrial Revolution (~1750).", difficultyLevel: 1 },
@@ -580,6 +568,5 @@ function seedClimateEducation(userId: string, p: string) {
       { contentId, conceptId: conceptIds[4], frontText: "What is climate mitigation? Give examples.", backText: "Actions reducing GHG emissions to tackle climate change causes. Examples: renewable energy, energy efficiency, sustainable transport, carbon capture. Policy tools: carbon taxes, cap-and-trade, clean energy subsidies.", difficultyLevel: 1 },
       { contentId, conceptId: conceptIds[5], frontText: "What is climate adaptation? Give examples.", backText: "Adjustments to reduce harm from climate impacts. Examples: sea walls, drought-resistant crops, improved water storage, updated building codes, early warning systems. Accepts some climate change is unavoidable.", difficultyLevel: 1 },
       { contentId, conceptId: conceptIds[7], frontText: "What is Education for Sustainable Development (ESD)?", backText: "An approach integrating environmental, social, and economic dimensions. Goes beyond science to shape values, attitudes, behaviours. Covers: mitigation (change consumption), adaptation (prepare locally), disaster risk reduction (emergency preparedness).", difficultyLevel: 2 },
-    ])
-    .run();
+    ]);
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { questions, quizAttempts, userProgress, userStats } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { calculateQuizXp, getLevelInfo } from "@/lib/learning/xp";
 import { checkBadges, awardBadges } from "@/lib/gamification/badge-engine";
 import { updateStreak } from "@/lib/gamification/update-streak";
@@ -27,11 +27,10 @@ export async function POST(
   };
 
   // Load all questions for grading
-  const allQuestions = db
+  const allQuestions = await db
     .select()
     .from(questions)
-    .where(eq(questions.contentId, contentId))
-    .all();
+    .where(eq(questions.contentId, contentId));
 
   const questionMap = new Map(allQuestions.map((q) => [q.id, q]));
 
@@ -76,7 +75,7 @@ export async function POST(
 
     // Update user progress for the concept
     if (question.conceptId) {
-      updateConceptProgress(
+      await updateConceptProgress(
         session.user.id,
         contentId,
         question.conceptId,
@@ -90,7 +89,7 @@ export async function POST(
   const xpEarned = calculateQuizXp(totalScore, maxScore, mode || "standard");
 
   // Create quiz attempt record
-  db.insert(quizAttempts)
+  await db.insert(quizAttempts)
     .values({
       userId: session.user.id,
       contentId,
@@ -101,20 +100,19 @@ export async function POST(
       maxScore,
       difficultyLevel: 1,
       answers: results as unknown as null,
-    })
-    .run();
+    });
 
   // Update user stats and streak
-  updateUserStats(session.user.id, xpEarned);
-  updateStreak(session.user.id);
+  await updateUserStats(session.user.id, xpEarned);
+  await updateStreak(session.user.id);
 
   // Check and award badges
-  const newBadges = checkBadges(session.user.id, "quiz_completed");
-  awardBadges(session.user.id, newBadges);
+  const newBadges = await checkBadges(session.user.id, "quiz_completed");
+  await awardBadges(session.user.id, newBadges);
 
   // Check concept mastery badges
-  const masteryBadges = checkBadges(session.user.id, "concept_mastered");
-  awardBadges(session.user.id, masteryBadges);
+  const masteryBadges = await checkBadges(session.user.id, "concept_mastered");
+  await awardBadges(session.user.id, masteryBadges);
 
   return NextResponse.json({
     quizId,
@@ -179,23 +177,24 @@ function getBloomsLevel(questionType: string): string {
   }
 }
 
-function updateConceptProgress(
+async function updateConceptProgress(
   userId: string,
   contentId: string,
   conceptId: string,
   isCorrect: boolean,
   questionType: string
 ) {
-  const existing = db
+  const existing = (await db
     .select()
     .from(userProgress)
-    .all()
-    .find(
-      (p) =>
-        p.userId === userId &&
-        p.contentId === contentId &&
-        p.conceptId === conceptId
-    );
+    .where(
+      and(
+        eq(userProgress.userId, userId),
+        eq(userProgress.contentId, contentId),
+        eq(userProgress.conceptId, conceptId)
+      )
+    )
+    .limit(1))[0];
 
   const newBlooms = getBloomsLevel(questionType);
 
@@ -212,7 +211,7 @@ function updateConceptProgress(
       ? newBlooms
       : (existing.bloomsAchieved ?? "remember");
 
-    db.update(userProgress)
+    await db.update(userProgress)
       .set({
         masteryLevel: Math.round(newMastery * 100) / 100,
         timesReviewed,
@@ -223,10 +222,9 @@ function updateConceptProgress(
         lastReviewedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(userProgress.id, existing.id))
-      .run();
+      .where(eq(userProgress.id, existing.id));
   } else {
-    db.insert(userProgress)
+    await db.insert(userProgress)
       .values({
         userId,
         contentId,
@@ -238,39 +236,36 @@ function updateConceptProgress(
         streak: isCorrect ? 1 : 0,
         bloomsAchieved: isCorrect ? newBlooms : "remember",
         lastReviewedAt: new Date(),
-      })
-      .run();
+      });
   }
 }
 
-function updateUserStats(userId: string, xpEarned: number) {
-  const existing = db
+async function updateUserStats(userId: string, xpEarned: number) {
+  const existing = (await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1))[0];
 
   if (existing) {
     const newXp = (existing.totalXp ?? 0) + xpEarned;
     const levelInfo = getLevelInfo(newXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newXp,
         level: levelInfo.level,
         totalQuizzesCompleted: (existing.totalQuizzesCompleted ?? 0) + 1,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, existing.id))
-      .run();
+      .where(eq(userStats.id, existing.id));
   } else {
     const levelInfo = getLevelInfo(xpEarned);
-    db.insert(userStats)
+    await db.insert(userStats)
       .values({
         userId,
         totalXp: xpEarned,
         level: levelInfo.level,
         totalQuizzesCompleted: 1,
-      })
-      .run();
+      });
   }
 }

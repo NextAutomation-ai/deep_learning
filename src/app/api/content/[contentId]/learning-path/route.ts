@@ -15,16 +15,16 @@ export async function GET(
 ) {
   const session = await getUser();
   const { contentId } = await params;
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!(await verifyContentOwnership(contentId, session.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // Check for cached path in content metadata
-  const content = db
+  const content = (await db
     .select()
     .from(contents)
     .where(eq(contents.id, contentId))
-    .get();
+    .limit(1))[0];
 
   if (!content) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -39,21 +39,19 @@ export async function GET(
   }
 
   // Generate learning path
-  const allConcepts = db
+  const allConcepts = await db
     .select()
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all();
+    .where(eq(concepts.contentId, contentId));
 
   if (allConcepts.length === 0) {
     return NextResponse.json({ lessons: [], cached: false });
   }
 
-  const relationships = db
+  const relationships = await db
     .select()
     .from(conceptRelationships)
-    .where(eq(conceptRelationships.contentId, contentId))
-    .all();
+    .where(eq(conceptRelationships.contentId, contentId));
 
   // Step 1: Topological sort
   const ordered = topologicalSort(
@@ -116,10 +114,9 @@ export async function GET(
   }
 
   // Cache in content metadata
-  db.update(contents)
+  await db.update(contents)
     .set({ metadata: { ...metadata, learningPath: lessons } })
-    .where(eq(contents.id, contentId))
-    .run();
+    .where(eq(contents.id, contentId));
 
   return NextResponse.json({ lessons, cached: false });
 }

@@ -17,7 +17,7 @@ export async function POST(
   try {
     const session = await getUser();
     const { contentId } = await params;
-    if (!verifyContentOwnership(contentId, session.user.id)) {
+    if (!(await verifyContentOwnership(contentId, session.user.id))) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const body = await request.json();
@@ -33,17 +33,17 @@ export async function POST(
       );
     }
 
-    const conceptA = db
+    const conceptA = (await db
       .select()
       .from(concepts)
       .where(eq(concepts.id, conceptIdA))
-      .get();
+      .limit(1))[0];
 
-    const conceptB = db
+    const conceptB = (await db
       .select()
       .from(concepts)
       .where(eq(concepts.id, conceptIdB))
-      .get();
+      .limit(1))[0];
 
     if (!conceptA || !conceptB) {
       return NextResponse.json(
@@ -53,11 +53,10 @@ export async function POST(
     }
 
     // Get source context from chunks
-    const chunks = db
+    const chunks = await db
       .select()
       .from(contentChunks)
-      .where(eq(contentChunks.contentId, contentId))
-      .all();
+      .where(eq(contentChunks.contentId, contentId));
 
     const sourceContext = chunks
       .slice(0, 4)

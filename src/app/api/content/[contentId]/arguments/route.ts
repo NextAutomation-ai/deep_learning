@@ -12,15 +12,14 @@ export async function GET(
   const { contentId } = await params;
 
   const session = await getUser();
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!(await verifyContentOwnership(contentId, session.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const args = db
+  const args = await db
     .select()
     .from(arguments_)
-    .where(eq(arguments_.contentId, contentId))
-    .all();
+    .where(eq(arguments_.contentId, contentId));
 
   return NextResponse.json({ arguments: args });
 }

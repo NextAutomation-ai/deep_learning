@@ -12,7 +12,7 @@ export async function POST(
   const { contentId } = await params;
 
   const session = await getUser();
-  if (!verifyContentOwnership(contentId, session.user.id)) {
+  if (!(await verifyContentOwnership(contentId, session.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -29,11 +29,11 @@ export async function POST(
     );
   }
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(arguments_)
     .where(eq(arguments_.id, argumentId))
-    .get();
+    .limit(1))[0];
 
   if (!existing) {
     return NextResponse.json({ error: "Argument not found" }, { status: 404 });
@@ -42,10 +42,9 @@ export async function POST(
   const currentCounterArgs = (existing.counterArguments as string[]) || [];
   const updated = [...currentCounterArgs, counterArgument];
 
-  db.update(arguments_)
+  await db.update(arguments_)
     .set({ counterArguments: updated })
-    .where(eq(arguments_.id, argumentId))
-    .run();
+    .where(eq(arguments_.id, argumentId));
 
   return NextResponse.json({
     argument: { ...existing, counterArguments: updated },

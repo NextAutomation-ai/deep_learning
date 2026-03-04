@@ -1,12 +1,15 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
   real,
+  boolean,
+  timestamp,
+  jsonb,
   primaryKey,
   index,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -14,23 +17,23 @@ import type { AdapterAccountType } from "next-auth/adapters";
 // AUTH TABLES (NextAuth Drizzle Adapter)
 // ============================================
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
   email: text("email").unique(),
-  emailVerified: integer("email_verified", { mode: "timestamp_ms" }),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+  createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
     () => new Date()
   ),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$defaultFn(
+  updatedAt: timestamp("updated_at", { mode: "date" }).$defaultFn(
     () => new Date()
   ),
 });
 
-export const accounts = sqliteTable(
+export const accounts = pgTable(
   "accounts",
   {
     userId: text("user_id")
@@ -54,20 +57,20 @@ export const accounts = sqliteTable(
   })
 );
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   sessionToken: text("session_token").primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
 });
 
-export const verificationTokens = sqliteTable(
+export const verificationTokens = pgTable(
   "verification_tokens",
   {
     identifier: text("identifier").notNull(),
     token: text("token").notNull(),
-    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
   },
   (t) => ({
     compositePk: primaryKey({ columns: [t.identifier, t.token] }),
@@ -78,7 +81,7 @@ export const verificationTokens = sqliteTable(
 // CONTENT TABLES
 // ============================================
 
-export const contents = sqliteTable(
+export const contents = pgTable(
   "contents",
   {
     id: text("id")
@@ -116,12 +119,12 @@ export const contents = sqliteTable(
       .default("pending"),
     processingError: text("processing_error"),
     processingProgress: integer("processing_progress").default(0),
-    metadata: text("metadata", { mode: "json" }),
+    metadata: jsonb("metadata"),
     isFavorited: integer("is_favorited").default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$defaultFn(
+    updatedAt: timestamp("updated_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -131,7 +134,7 @@ export const contents = sqliteTable(
   })
 );
 
-export const contentChunks = sqliteTable(
+export const contentChunks = pgTable(
   "content_chunks",
   {
     id: text("id")
@@ -145,7 +148,7 @@ export const contentChunks = sqliteTable(
     sectionTitle: text("section_title"),
     text: text("text").notNull(),
     tokenCount: integer("token_count"),
-    metadata: text("metadata", { mode: "json" }),
+    metadata: jsonb("metadata"),
   },
   (table) => ({
     contentIdx: index("chunks_content_idx").on(table.contentId),
@@ -156,7 +159,7 @@ export const contentChunks = sqliteTable(
 // CONCEPT TABLES
 // ============================================
 
-export const concepts = sqliteTable(
+export const concepts = pgTable(
   "concepts",
   {
     id: text("id")
@@ -197,10 +200,10 @@ export const concepts = sqliteTable(
         "create",
       ],
     }),
-    prerequisites: text("prerequisites", { mode: "json" }).$type<string[]>(),
-    tags: text("tags", { mode: "json" }).$type<string[]>(),
+    prerequisites: jsonb("prerequisites").$type<string[]>(),
+    tags: jsonb("tags").$type<string[]>(),
     importanceScore: real("importance_score").default(0.5),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -209,7 +212,7 @@ export const concepts = sqliteTable(
   })
 );
 
-export const conceptRelationships = sqliteTable(
+export const conceptRelationships = pgTable(
   "concept_relationships",
   {
     id: text("id")
@@ -250,7 +253,7 @@ export const conceptRelationships = sqliteTable(
 // ARGUMENTS TABLE (Critical Thinking)
 // ============================================
 
-export const arguments_ = sqliteTable(
+export const arguments_ = pgTable(
   "arguments",
   {
     id: text("id")
@@ -261,16 +264,14 @@ export const arguments_ = sqliteTable(
       .references(() => contents.id, { onDelete: "cascade" }),
     chunkId: text("chunk_id").references(() => contentChunks.id),
     thesis: text("thesis").notNull(),
-    premises: text("premises", { mode: "json" }).$type<string[]>(),
-    evidence: text("evidence", { mode: "json" }).$type<string[]>(),
-    assumptions: text("assumptions", { mode: "json" }).$type<string[]>(),
+    premises: jsonb("premises").$type<string[]>(),
+    evidence: jsonb("evidence").$type<string[]>(),
+    assumptions: jsonb("assumptions").$type<string[]>(),
     conclusion: text("conclusion"),
     logicalStructure: text("logical_structure"),
-    fallacies: text("fallacies", { mode: "json" }).$type<string[]>(),
+    fallacies: jsonb("fallacies").$type<string[]>(),
     strengthScore: real("strength_score").default(0.5),
-    counterArguments: text("counter_arguments", { mode: "json" }).$type<
-      string[]
-    >(),
+    counterArguments: jsonb("counter_arguments").$type<string[]>(),
   },
   (table) => ({
     contentIdx: index("arguments_content_idx").on(table.contentId),
@@ -281,7 +282,7 @@ export const arguments_ = sqliteTable(
 // QUIZ & FLASHCARD TABLES
 // ============================================
 
-export const questions = sqliteTable(
+export const questions = pgTable(
   "questions",
   {
     id: text("id")
@@ -312,7 +313,7 @@ export const questions = sqliteTable(
       ],
     }).notNull(),
     questionText: text("question_text").notNull(),
-    options: text("options", { mode: "json" }),
+    options: jsonb("options"),
     correctAnswer: text("correct_answer"),
     explanation: text("explanation"),
     difficultyLevel: integer("difficulty_level").default(1),
@@ -328,8 +329,8 @@ export const questions = sqliteTable(
     }),
     points: integer("points").default(10),
     timeLimitSeconds: integer("time_limit_seconds").default(60),
-    tags: text("tags", { mode: "json" }).$type<string[]>(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    tags: jsonb("tags").$type<string[]>(),
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -339,7 +340,7 @@ export const questions = sqliteTable(
   })
 );
 
-export const flashcards = sqliteTable(
+export const flashcards = pgTable(
   "flashcards",
   {
     id: text("id")
@@ -352,7 +353,7 @@ export const flashcards = sqliteTable(
     frontText: text("front_text").notNull(),
     backText: text("back_text").notNull(),
     difficultyLevel: integer("difficulty_level").default(1),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -365,7 +366,7 @@ export const flashcards = sqliteTable(
 // USER PROGRESS & GAMIFICATION
 // ============================================
 
-export const userProgress = sqliteTable(
+export const userProgress = pgTable(
   "user_progress",
   {
     id: text("id")
@@ -385,15 +386,15 @@ export const userProgress = sqliteTable(
     timesReviewed: integer("times_reviewed").default(0),
     timesCorrect: integer("times_correct").default(0),
     timesIncorrect: integer("times_incorrect").default(0),
-    lastReviewedAt: integer("last_reviewed_at", { mode: "timestamp_ms" }),
-    nextReviewAt: integer("next_review_at", { mode: "timestamp_ms" }),
+    lastReviewedAt: timestamp("last_reviewed_at", { mode: "date" }),
+    nextReviewAt: timestamp("next_review_at", { mode: "date" }),
     easeFactor: real("ease_factor").default(2.5),
     intervalDays: integer("interval_days").default(1),
     streak: integer("streak").default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$defaultFn(
+    updatedAt: timestamp("updated_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -406,7 +407,7 @@ export const userProgress = sqliteTable(
   })
 );
 
-export const quizAttempts = sqliteTable(
+export const quizAttempts = pgTable(
   "quiz_attempts",
   {
     id: text("id")
@@ -425,8 +426,8 @@ export const quizAttempts = sqliteTable(
     maxScore: integer("max_score").default(0),
     timeTakenSeconds: integer("time_taken_seconds"),
     difficultyLevel: integer("difficulty_level").default(1),
-    answers: text("answers", { mode: "json" }),
-    completedAt: integer("completed_at", { mode: "timestamp_ms" }).$defaultFn(
+    answers: jsonb("answers"),
+    completedAt: timestamp("completed_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -436,7 +437,7 @@ export const quizAttempts = sqliteTable(
   })
 );
 
-export const userStats = sqliteTable("user_stats", {
+export const userStats = pgTable("user_stats", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -452,13 +453,13 @@ export const userStats = sqliteTable("user_stats", {
   totalConceptsMastered: integer("total_concepts_mastered").default(0),
   totalQuizzesCompleted: integer("total_quizzes_completed").default(0),
   totalTimeSpentMinutes: integer("total_time_spent_minutes").default(0),
-  badges: text("badges", { mode: "json" }).$type<string[]>(),
-  achievements: text("achievements", { mode: "json" }).$type<string[]>(),
-  weeklyXp: text("weekly_xp", { mode: "json" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+  badges: jsonb("badges").$type<string[]>(),
+  achievements: jsonb("achievements").$type<string[]>(),
+  weeklyXp: jsonb("weekly_xp"),
+  createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
     () => new Date()
   ),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$defaultFn(
+  updatedAt: timestamp("updated_at", { mode: "date" }).$defaultFn(
     () => new Date()
   ),
 });
@@ -467,7 +468,7 @@ export const userStats = sqliteTable("user_stats", {
 // LEARNING SESSIONS
 // ============================================
 
-export const learningSessions = sqliteTable(
+export const learningSessions = pgTable(
   "learning_sessions",
   {
     id: text("id")
@@ -492,15 +493,13 @@ export const learningSessions = sqliteTable(
         "bias_detection",
       ],
     }),
-    startedAt: integer("started_at", { mode: "timestamp_ms" }).$defaultFn(
+    startedAt: timestamp("started_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
-    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+    endedAt: timestamp("ended_at", { mode: "date" }),
     durationMinutes: integer("duration_minutes"),
     xpEarned: integer("xp_earned").default(0),
-    conceptsCovered: text("concepts_covered", { mode: "json" }).$type<
-      string[]
-    >(),
+    conceptsCovered: jsonb("concepts_covered").$type<string[]>(),
   },
   (table) => ({
     userIdx: index("sessions_user_idx").on(table.userId),
@@ -512,7 +511,7 @@ export const learningSessions = sqliteTable(
 // AI CACHE
 // ============================================
 
-export const aiCache = sqliteTable(
+export const aiCache = pgTable(
   "ai_cache",
   {
     id: text("id")
@@ -522,8 +521,8 @@ export const aiCache = sqliteTable(
     contentHash: text("content_hash").notNull(),
     promptHash: text("prompt_hash").notNull(),
     modelUsed: text("model_used"),
-    result: text("result", { mode: "json" }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    result: jsonb("result").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -540,7 +539,7 @@ export const aiCache = sqliteTable(
 // TEACH-BACK RESPONSES
 // ============================================
 
-export const teachBackResponses = sqliteTable(
+export const teachBackResponses = pgTable(
   "teach_back_responses",
   {
     id: text("id")
@@ -558,7 +557,7 @@ export const teachBackResponses = sqliteTable(
     completenessScore: real("completeness_score"),
     accuracyScore: real("accuracy_score"),
     criticalThinkingScore: real("critical_thinking_score"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
   },
@@ -572,7 +571,7 @@ export const teachBackResponses = sqliteTable(
 // CRITICAL THINKING: SOCRATIC SESSIONS
 // ============================================
 
-export const socraticSessions = sqliteTable(
+export const socraticSessions = pgTable(
   "socratic_sessions",
   {
     id: text("id")
@@ -588,7 +587,7 @@ export const socraticSessions = sqliteTable(
     status: text("status", { enum: ["active", "completed"] }).default(
       "active"
     ),
-    messages: text("messages", { mode: "json" }).$type<
+    messages: jsonb("messages").$type<
       Array<{ role: "ai" | "user"; content: string; timestamp: number }>
     >(),
     depthScore: real("depth_score"),
@@ -598,10 +597,10 @@ export const socraticSessions = sqliteTable(
     overallScore: real("overall_score"),
     questionsAsked: integer("questions_asked").default(0),
     xpEarned: integer("xp_earned").default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
-    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
   },
   (table) => ({
     userIdx: index("socratic_user_idx").on(table.userId),
@@ -613,7 +612,7 @@ export const socraticSessions = sqliteTable(
 // CRITICAL THINKING: DEVIL'S ADVOCATE DEBATES
 // ============================================
 
-export const devilsAdvocateDebates = sqliteTable(
+export const devilsAdvocateDebates = pgTable(
   "devils_advocate_debates",
   {
     id: text("id")
@@ -627,13 +626,11 @@ export const devilsAdvocateDebates = sqliteTable(
       .references(() => contents.id, { onDelete: "cascade" }),
     argumentId: text("argument_id").references(() => arguments_.id),
     originalClaim: text("original_claim").notNull(),
-    steelManMode: integer("steel_man_mode", { mode: "boolean" }).default(
-      false
-    ),
+    steelManMode: boolean("steel_man_mode").default(false),
     status: text("status", { enum: ["active", "completed"] }).default(
       "active"
     ),
-    messages: text("messages", { mode: "json" }).$type<
+    messages: jsonb("messages").$type<
       Array<{ role: "ai" | "user"; content: string; timestamp: number }>
     >(),
     reasoningScore: real("reasoning_score"),
@@ -641,10 +638,10 @@ export const devilsAdvocateDebates = sqliteTable(
     counterPointsScore: real("counter_points_score"),
     overallScore: real("overall_score"),
     xpEarned: integer("xp_earned").default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
-    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
   },
   (table) => ({
     userIdx: index("devils_advocate_user_idx").on(table.userId),
@@ -656,7 +653,7 @@ export const devilsAdvocateDebates = sqliteTable(
 // CRITICAL THINKING: BIAS DETECTION EXERCISES
 // ============================================
 
-export const biasDetectionExercises = sqliteTable(
+export const biasDetectionExercises = pgTable(
   "bias_detection_exercises",
   {
     id: text("id")
@@ -670,10 +667,8 @@ export const biasDetectionExercises = sqliteTable(
       .references(() => contents.id, { onDelete: "cascade" }),
     chunkId: text("chunk_id").references(() => contentChunks.id),
     passage: text("passage").notNull(),
-    guidedQuestions: text("guided_questions", { mode: "json" }).$type<
-      string[]
-    >(),
-    userResponses: text("user_responses", { mode: "json" }).$type<
+    guidedQuestions: jsonb("guided_questions").$type<string[]>(),
+    userResponses: jsonb("user_responses").$type<
       Array<{ question: string; answer: string }>
     >(),
     aiFeedback: text("ai_feedback"),
@@ -682,10 +677,10 @@ export const biasDetectionExercises = sqliteTable(
     biasIdentificationScore: real("bias_identification_score"),
     overallScore: real("overall_score"),
     xpEarned: integer("xp_earned").default(0),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(
+    createdAt: timestamp("created_at", { mode: "date" }).$defaultFn(
       () => new Date()
     ),
-    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
   },
   (table) => ({
     userIdx: index("bias_detection_user_idx").on(table.userId),

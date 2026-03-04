@@ -21,15 +21,15 @@ export async function GET(
   const userSession = await getUser();
   const { contentId, sessionId } = await params;
 
-  if (!verifyContentOwnership(contentId, userSession.user.id)) {
+  if (!(await verifyContentOwnership(contentId, userSession.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const session = db
+  const session = (await db
     .select()
     .from(socraticSessions)
     .where(eq(socraticSessions.id, sessionId))
-    .get();
+    .limit(1))[0];
 
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -46,7 +46,7 @@ export async function POST(
     const user = await getUser();
     const { contentId, sessionId } = await params;
 
-    if (!verifyContentOwnership(contentId, user.user.id)) {
+    if (!(await verifyContentOwnership(contentId, user.user.id))) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const body = await request.json();
@@ -55,11 +55,11 @@ export async function POST(
       action?: "complete";
     };
 
-    const session = db
+    const session = (await db
       .select()
       .from(socraticSessions)
       .where(eq(socraticSessions.id, sessionId))
-      .get();
+      .limit(1))[0];
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -74,7 +74,7 @@ export async function POST(
     // Complete the session and evaluate
     if (action === "complete") {
       const concept = session.conceptId
-        ? db.select().from(concepts).where(eq(concepts.id, session.conceptId)).get()
+        ? (await db.select().from(concepts).where(eq(concepts.id, session.conceptId)).limit(1))[0]
         : null;
 
       const evalMessages = buildSocraticEvaluationPrompt(
@@ -97,7 +97,7 @@ export async function POST(
 
       const xpEarned = Math.round(XP_REWARDS.socratic_session * overallScore);
 
-      db.update(socraticSessions)
+      await db.update(socraticSessions)
         .set({
           status: "completed",
           depthScore: evaluation.depth,
@@ -108,16 +108,15 @@ export async function POST(
           xpEarned,
           completedAt: new Date(),
         })
-        .where(eq(socraticSessions.id, sessionId))
-        .run();
+        .where(eq(socraticSessions.id, sessionId));
 
       // Award XP and update streak
-      updateUserStats(user.user.id, xpEarned);
-      updateStreak(user.user.id);
+      await updateUserStats(user.user.id, xpEarned);
+      await updateStreak(user.user.id);
 
       // Check thinking badges
-      const newBadges = checkBadges(user.user.id, "thinking_completed");
-      awardBadges(user.user.id, newBadges);
+      const newBadges = await checkBadges(user.user.id, "thinking_completed");
+      await awardBadges(user.user.id, newBadges);
 
       return NextResponse.json({
         completed: true,
@@ -147,7 +146,7 @@ export async function POST(
 
     // Get concept for context
     const concept = session.conceptId
-      ? db.select().from(concepts).where(eq(concepts.id, session.conceptId)).get()
+      ? (await db.select().from(concepts).where(eq(concepts.id, session.conceptId)).limit(1))[0]
       : null;
 
     const promptMessages = buildSocraticQuestionPrompt(
@@ -169,13 +168,12 @@ export async function POST(
       timestamp: Date.now(),
     });
 
-    db.update(socraticSessions)
+    await db.update(socraticSessions)
       .set({
         messages: updatedMessages,
         questionsAsked: (session.questionsAsked ?? 0) + 1,
       })
-      .where(eq(socraticSessions.id, sessionId))
-      .run();
+      .where(eq(socraticSessions.id, sessionId));
 
     return NextResponse.json({
       aiResponse,
@@ -190,32 +188,32 @@ export async function POST(
   }
 }
 
-function updateUserStats(userId: string, xpEarned: number) {
-  const existing = db
+async function updateUserStats(userId: string, xpEarned: number) {
+  const allStats = await db
     .select()
     .from(userStats)
-    .all()
-    .find((s) => s.userId === userId);
+    .where(eq(userStats.userId, userId))
+    .limit(1);
+
+  const existing = allStats[0];
 
   if (existing) {
     const newXp = (existing.totalXp ?? 0) + xpEarned;
     const levelInfo = getLevelInfo(newXp);
-    db.update(userStats)
+    await db.update(userStats)
       .set({
         totalXp: newXp,
         level: levelInfo.level,
         updatedAt: new Date(),
       })
-      .where(eq(userStats.id, existing.id))
-      .run();
+      .where(eq(userStats.id, existing.id));
   } else {
     const levelInfo = getLevelInfo(xpEarned);
-    db.insert(userStats)
+    await db.insert(userStats)
       .values({
         userId,
         totalXp: xpEarned,
         level: levelInfo.level,
-      })
-      .run();
+      });
   }
 }

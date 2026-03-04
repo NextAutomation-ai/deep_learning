@@ -9,18 +9,18 @@ export async function GET(
 ) {
   const { conceptId } = await params;
 
-  const concept = db
+  const concept = (await db
     .select()
     .from(concepts)
     .where(eq(concepts.id, conceptId))
-    .get();
+    .limit(1))[0];
 
   if (!concept) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // Get related concepts
-  const relationships = db
+  const relationships = await db
     .select()
     .from(conceptRelationships)
     .where(
@@ -28,8 +28,7 @@ export async function GET(
         eq(conceptRelationships.sourceConceptId, conceptId),
         eq(conceptRelationships.targetConceptId, conceptId)
       )
-    )
-    .all();
+    );
 
   // Get names for related concepts
   const relatedIds = new Set<string>();
@@ -39,10 +38,9 @@ export async function GET(
   }
 
   const relatedConcepts = relatedIds.size > 0
-    ? db
+    ? (await db
         .select({ id: concepts.id, name: concepts.name, definition: concepts.definition })
-        .from(concepts)
-        .all()
+        .from(concepts))
         .filter((c) => relatedIds.has(c.id))
     : [];
 

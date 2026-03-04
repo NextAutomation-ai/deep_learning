@@ -9,12 +9,11 @@ export async function GET() {
   const userId = session.user.id;
 
   // Get user content IDs
-  const userContentIds = db
+  const userContentRows = await db
     .select({ id: contents.id })
     .from(contents)
-    .where(eq(contents.userId, userId))
-    .all()
-    .map((c) => c.id);
+    .where(eq(contents.userId, userId));
+  const userContentIds = userContentRows.map((c) => c.id);
 
   if (userContentIds.length === 0) {
     return NextResponse.json({
@@ -23,18 +22,17 @@ export async function GET() {
   }
 
   // Get total concept count for user's content
-  const allConcepts = db.select({ id: concepts.id, contentId: concepts.contentId }).from(concepts).all();
+  const allConcepts = await db.select({ id: concepts.id, contentId: concepts.contentId }).from(concepts);
   const userConcepts = allConcepts.filter((c) =>
     userContentIds.includes(c.contentId)
   );
   const totalConcepts = userConcepts.length;
 
   // Get progress rows
-  const progressRows = db
+  const progressRows = await db
     .select()
     .from(userProgress)
-    .where(eq(userProgress.userId, userId))
-    .all();
+    .where(eq(userProgress.userId, userId));
 
   let learning = 0;
   let practicing = 0;

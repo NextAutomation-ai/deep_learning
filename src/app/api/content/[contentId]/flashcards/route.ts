@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { flashcards, userProgress } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -11,19 +11,21 @@ export async function GET(
   const session = await getUser();
   const { contentId } = await params;
 
-  const allFlashcards = db
+  const allFlashcards = await db
     .select()
     .from(flashcards)
-    .where(eq(flashcards.contentId, contentId))
-    .all();
+    .where(eq(flashcards.contentId, contentId));
 
   // Get user progress for SM-2 state
-  const progressRows = db
+  const progressRows = await db
     .select()
     .from(userProgress)
-    .where(eq(userProgress.contentId, contentId))
-    .all()
-    .filter((p) => p.userId === session.user.id);
+    .where(
+      and(
+        eq(userProgress.contentId, contentId),
+        eq(userProgress.userId, session.user.id)
+      )
+    );
 
   const progressMap = new Map(progressRows.map((p) => [p.conceptId, p]));
   const now = Date.now();

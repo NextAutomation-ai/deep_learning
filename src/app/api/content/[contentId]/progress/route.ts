@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import { concepts, userProgress, quizAttempts } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -11,25 +11,30 @@ export async function GET(
   const session = await getUser();
   const { contentId } = await params;
 
-  const allConcepts = db
+  const allConcepts = await db
     .select()
     .from(concepts)
-    .where(eq(concepts.contentId, contentId))
-    .all();
+    .where(eq(concepts.contentId, contentId));
 
-  const progressRows = db
+  const progressRows = await db
     .select()
     .from(userProgress)
-    .where(eq(userProgress.contentId, contentId))
-    .all()
-    .filter((p) => p.userId === session.user.id);
+    .where(
+      and(
+        eq(userProgress.contentId, contentId),
+        eq(userProgress.userId, session.user.id)
+      )
+    );
 
-  const quizzes = db
+  const quizzes = await db
     .select()
     .from(quizAttempts)
-    .where(eq(quizAttempts.contentId, contentId))
-    .all()
-    .filter((q) => q.userId === session.user.id);
+    .where(
+      and(
+        eq(quizAttempts.contentId, contentId),
+        eq(quizAttempts.userId, session.user.id)
+      )
+    );
 
   // Overall mastery
   const totalMastery =
