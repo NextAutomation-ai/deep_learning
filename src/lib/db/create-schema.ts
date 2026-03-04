@@ -1,11 +1,11 @@
-import type Database from "better-sqlite3";
+import type BetterSqlite3 from "better-sqlite3";
 
 /**
  * Creates all database tables and indexes if they don't already exist.
  * Embedded SQL eliminates dependency on external migration files (drizzle/ folder),
  * which was unreliable in Docker builds on Render.com.
  */
-export function createSchema(sqlite: Database) {
+export function createSchema(sqlite: BetterSqlite3.Database) {
   sqlite.exec(`
     -- Users (must be first — many tables reference it)
     CREATE TABLE IF NOT EXISTS \`users\` (
