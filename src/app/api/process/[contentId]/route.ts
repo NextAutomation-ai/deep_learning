@@ -42,6 +42,7 @@ export async function POST(
     );
   }
 
+  // Already fully completed — skip unless force reprocess
   if (
     content.processingStatus === "completed" &&
     (content.totalConcepts ?? 0) > 0 &&
@@ -50,11 +51,8 @@ export async function POST(
     return NextResponse.json({ message: "Already processed" });
   }
 
-  // If reprocessing, clean up old generated data
-  if (
-    content.processingStatus === "completed" ||
-    content.processingStatus === "failed"
-  ) {
+  // Only clean up when explicitly force-reprocessing a completed item
+  if (forceReprocess && content.processingStatus === "completed") {
     await db.delete(flashcards).where(eq(flashcards.contentId, contentId));
     await db.delete(questions).where(eq(questions.contentId, contentId));
     await db.delete(arguments_).where(eq(arguments_.contentId, contentId));
@@ -76,8 +74,14 @@ export async function POST(
       .where(eq(contents.id, contentId));
   }
 
-  // Use waitUntil to keep the serverless function alive while processing runs
-  // The pipeline updates the database with progress, so the status route can poll it
+  // Clear failed status so pipeline can resume
+  if (content.processingStatus === "failed") {
+    await db.update(contents)
+      .set({ processingStatus: "pending", processingError: null })
+      .where(eq(contents.id, contentId));
+  }
+
+  // Pipeline is resumable — each step checks if data already exists and skips
   waitUntil(
     processContent(contentId).catch((err) =>
       console.error(`Processing failed for ${contentId}:`, err)
