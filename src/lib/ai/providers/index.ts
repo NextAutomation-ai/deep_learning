@@ -20,104 +20,104 @@ const TASK_MODEL_MAP: Record<
   // Content Processing
   content_chunking: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
     { provider: "openrouter", model: "meta-llama/llama-4-scout" },
   ],
   concept_extraction: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   relationship_mapping: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   argument_extraction: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
 
   // Quiz & Flashcard Generation
   mcq_generation: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   true_false_generation: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   flashcard_generation: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   scenario_generation: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
 
   // Critical Thinking
   socratic_questions: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   devils_advocate: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   bias_detection: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   what_if_scenarios: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   evaluate_response: [
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   teach_back_evaluation: [
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
 
   // General
   summarize_section: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "grok", model: "grok-3" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   explain_concept: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   deep_dive_qa: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   compare_concepts: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
   general: [
     { provider: "openrouter", model: "google/gemma-3-27b-it:free" },
     { provider: "openrouter", model: "deepseek/deepseek-chat" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
+    { provider: "gemini", model: "gemini-2.0-flash" },
   ],
 };
 

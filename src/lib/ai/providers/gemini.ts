@@ -16,7 +16,7 @@ export const geminiProvider: AIProviderClient = {
 
   async complete(request: AICompletionRequest): Promise<AICompletionResponse> {
     const client = getClient();
-    const modelId = request.model || "gemini-2.5-flash";
+    const modelId = request.model || "gemini-2.0-flash";
     const model = client.getGenerativeModel({
       model: modelId,
       generationConfig: {
