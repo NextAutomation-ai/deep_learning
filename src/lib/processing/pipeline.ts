@@ -154,11 +154,13 @@ export async function processContent(contentId: string): Promise<void> {
               responseFormat: "json",
             });
             const parsed = safeJsonParse<{ concepts: ExtractedConcept[] }>(response.content);
+            if (!parsed) console.error("Failed to parse concept extraction response:", response.content.slice(0, 500));
             return (parsed?.concepts || []).map((c) => ({ ...c, chunkId: chunk.id }));
           })
         );
         for (const r of batchResults) {
           if (r.status === "fulfilled") allConcepts.push(...r.value);
+          else console.error("Concept extraction batch failed:", r.reason);
         }
         const progress = 25 + Math.round(((i + BATCH_SIZE) / maxChunks) * 25);
         await updateStatus(contentId, "analyzing", Math.min(progress, 50));
@@ -196,6 +198,10 @@ export async function processContent(contentId: string): Promise<void> {
 
       existingConcepts = await db.select().from(concepts).where(eq(concepts.contentId, contentId));
       await db.update(contents).set({ totalConcepts: existingConcepts.length }).where(eq(contents.id, contentId));
+
+      if (existingConcepts.length === 0) {
+        throw new Error("We couldn't analyze this content. The AI service may be unavailable — please try again in a few minutes.");
+      }
     }
 
     const insertedConcepts = existingConcepts.map((c) => ({ id: c.id, name: c.name }));
@@ -222,6 +228,7 @@ export async function processContent(contentId: string): Promise<void> {
           responseFormat: "json",
         });
         const parsed = safeJsonParse<{ relationships: ExtractedRelationship[] }>(relResponse.content);
+        if (!parsed) console.error("Failed to parse relationship mapping response:", relResponse.content.slice(0, 500));
         if (parsed?.relationships) {
           for (const rel of parsed.relationships) {
             const sourceId = conceptIdLookup.get(rel.source?.toLowerCase());
@@ -257,7 +264,7 @@ export async function processContent(contentId: string): Promise<void> {
       const argChunks = chunkRecords.slice(0, Math.min(chunkRecords.length, 5)); // Limit for speed
       for (let i = 0; i < argChunks.length; i += BATCH_SIZE) {
         const batch = argChunks.slice(i, i + BATCH_SIZE);
-        await Promise.allSettled(
+        const argResults = await Promise.allSettled(
           batch.map(async (chunk) => {
             const prompt = buildArgumentExtractionPrompt(chunk.text);
             const response = await aiComplete({
@@ -266,6 +273,7 @@ export async function processContent(contentId: string): Promise<void> {
               responseFormat: "json",
             });
             const parsed = safeJsonParse<{ arguments: ExtractedArgument[] }>(response.content);
+            if (!parsed) console.error("Failed to parse argument extraction response:", response.content.slice(0, 500));
             if (parsed?.arguments) {
               for (const arg of parsed.arguments) {
                 await db.insert(arguments_).values({
@@ -285,6 +293,9 @@ export async function processContent(contentId: string): Promise<void> {
             }
           })
         );
+        for (const r of argResults) {
+          if (r.status === "rejected") console.error("Argument extraction failed:", r.reason);
+        }
       }
     }
 
@@ -313,6 +324,7 @@ export async function processContent(contentId: string): Promise<void> {
             responseFormat: "json",
           });
           const parsed = safeJsonParse<{ questions: GeneratedQuestion[] }>(response.content);
+          if (!parsed) console.error(`Failed to parse quiz generation (${difficulty}) response:`, response.content.slice(0, 500));
           if (parsed?.questions) {
             for (const q of parsed.questions) {
               const conceptId = q.related_concept
@@ -361,6 +373,7 @@ export async function processContent(contentId: string): Promise<void> {
           responseFormat: "json",
         });
         const parsed = safeJsonParse<{ flashcards: GeneratedFlashcard[] }>(response.content);
+        if (!parsed) console.error("Failed to parse flashcard generation response:", response.content.slice(0, 500));
         if (parsed?.flashcards) {
           for (const fc of parsed.flashcards) {
             const conceptId = findMatchingConcept(fc.front_text, conceptIdLookup);
