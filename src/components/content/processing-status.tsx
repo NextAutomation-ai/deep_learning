@@ -1,7 +1,7 @@
 "use client";
 
 import { useProcessingStatus } from "@/hooks/use-processing-status";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const statusLabels: Record<string, string> = {
@@ -13,6 +13,25 @@ const statusLabels: Record<string, string> = {
   completed: "Processing complete!",
   failed: "Processing failed",
 };
+
+function getFriendlyError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("limit") || lower.includes("quota") || lower.includes("429"))
+    return "AI usage limit reached. Please wait a few minutes and try again.";
+  if (lower.includes("unavailable") || lower.includes("all ai"))
+    return "AI service is temporarily unavailable. Please try again in a few minutes.";
+  if (lower.includes("no text") || lower.includes("could not be extracted"))
+    return "We couldn't read any text from this file. Please try a different file.";
+  if (lower.includes("not found"))
+    return "This content could not be found.";
+  if (lower.includes("timeout") || lower.includes("timed out"))
+    return "Processing took too long. Please try again with a smaller file.";
+  // Already user-friendly
+  if (!message.includes("Error:") && !message.includes("at ") && !message.includes("ENOENT")) {
+    return message;
+  }
+  return "Something went wrong during processing. Please try again.";
+}
 
 export function ProcessingStatusBar({
   contentId,
@@ -31,12 +50,14 @@ export function ProcessingStatusBar({
 
   const currentStatus = liveStatus?.status || initialStatus || "pending";
   const currentProgress = liveStatus?.progress || initialProgress || 0;
-  const message =
-    liveStatus?.message || statusLabels[currentStatus] || currentStatus;
 
   const isCompleted = currentStatus === "completed";
   const isFailed = currentStatus === "failed";
   const isProcessing = !isCompleted && !isFailed;
+
+  const displayMessage = isFailed
+    ? getFriendlyError(liveStatus?.message || "Processing failed")
+    : statusLabels[currentStatus] || currentStatus;
 
   return (
     <div className="space-y-2">
@@ -44,7 +65,7 @@ export function ProcessingStatusBar({
         {isCompleted && (
           <CheckCircle className="h-4 w-4 text-success" />
         )}
-        {isFailed && <XCircle className="h-4 w-4 text-danger" />}
+        {isFailed && <AlertTriangle className="h-4 w-4 text-danger" />}
         {isProcessing && (
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
         )}
@@ -56,7 +77,7 @@ export function ProcessingStatusBar({
             isProcessing && "text-primary"
           )}
         >
-          {message}
+          {displayMessage}
         </span>
       </div>
 

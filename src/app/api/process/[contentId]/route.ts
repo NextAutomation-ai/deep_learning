@@ -1,4 +1,7 @@
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { requireAuth } from "@/lib/auth/get-user";
 import { db } from "@/lib/db";
 import {
@@ -12,7 +15,6 @@ import {
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { processContent } from "@/lib/processing/pipeline";
-import { processingStatus } from "@/lib/processing/status";
 
 export async function POST(
   request: NextRequest,
@@ -34,7 +36,10 @@ export async function POST(
     .limit(1))[0];
 
   if (!content) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Content not found." },
+      { status: 404 }
+    );
   }
 
   if (
@@ -71,11 +76,12 @@ export async function POST(
       .where(eq(contents.id, contentId));
   }
 
-  const emitter = processingStatus.createEmitter(contentId);
-
-  // Fire and forget — processing runs in background
-  processContent(contentId, emitter).catch((err) =>
-    console.error(`Processing failed for ${contentId}:`, err)
+  // Use waitUntil to keep the serverless function alive while processing runs
+  // The pipeline updates the database with progress, so the status route can poll it
+  waitUntil(
+    processContent(contentId).catch((err) =>
+      console.error(`Processing failed for ${contentId}:`, err)
+    )
   );
 
   return NextResponse.json({

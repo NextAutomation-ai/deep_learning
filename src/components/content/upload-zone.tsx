@@ -5,6 +5,18 @@ import { useDropzone } from "react-dropzone";
 import { Upload, FileText, Link as LinkIcon, Type, X, Loader2 } from "lucide-react";
 import { useUploadContent, useProcessContent } from "@/hooks/use-content";
 import { cn } from "@/lib/utils/cn";
+import { toastError } from "@/hooks/use-toast";
+
+function getUploadError(err: unknown): string {
+  if (err instanceof Error) {
+    const msg = err.message;
+    // Already user-friendly from our API
+    if (!msg.includes("Error:") && !msg.includes("at ") && msg.length < 200) {
+      return msg;
+    }
+  }
+  return "Something went wrong. Please try again.";
+}
 
 interface UploadZoneProps {
   onUploadComplete?: (contentId: string) => void;
@@ -36,7 +48,9 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
         await processMutation.mutateAsync(contentId);
         onUploadComplete?.(contentId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed");
+        const msg = getUploadError(err);
+        setError(msg);
+        toastError("Upload failed", msg);
       }
     },
     [uploadMutation, processMutation, title, onUploadComplete]
@@ -70,7 +84,9 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
       setUrl("");
       onUploadComplete?.(contentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      const msg = getUploadError(err);
+      setError(msg);
+      toastError("Import failed", msg);
     }
   };
 
@@ -89,7 +105,9 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
       setText("");
       onUploadComplete?.(contentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      const msg = getUploadError(err);
+      setError(msg);
+      toastError("Import failed", msg);
     }
   };
 
@@ -152,7 +170,7 @@ export function UploadZone({ onUploadComplete }: UploadZoneProps) {
                   : "Drag & drop or click to upload"}
               </p>
               <p className="mt-1 text-xs text-text-secondary">
-                PDF, DOCX, EPUB, or TXT (max 50MB)
+                PDF, DOCX, EPUB, or TXT (max 4.5MB)
               </p>
             </>
           )}

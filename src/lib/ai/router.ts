@@ -104,7 +104,27 @@ export async function aiComplete(
     }
   }
 
-  throw lastError || new Error("All AI providers failed");
+  // Provide user-friendly error messages
+  const msg = lastError?.message || "";
+  const lower = msg.toLowerCase();
+  if (lower.includes("429") || lower.includes("rate limit") || lower.includes("quota") || lower.includes("exceeded")) {
+    throw new Error(
+      "AI usage limit reached. Please wait a few minutes and try again."
+    );
+  }
+  if (lower.includes("401") || lower.includes("403") || lower.includes("unauthorized") || lower.includes("invalid key")) {
+    throw new Error(
+      "AI service connection issue. Please try again later."
+    );
+  }
+  if (lower.includes("timeout") || lower.includes("etimedout") || lower.includes("econnrefused")) {
+    throw new Error(
+      "AI service is taking too long to respond. Please try again."
+    );
+  }
+  throw new Error(
+    "AI service is temporarily unavailable. Please try again in a few minutes."
+  );
 }
 
 /**
