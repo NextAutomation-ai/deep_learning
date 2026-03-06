@@ -30,7 +30,7 @@ import type { ExtractedArgument } from "@/lib/ai/prompts/argument-extraction";
 import { downloadFile } from "@/lib/storage/supabase";
 import { createHash } from "crypto";
 
-const BATCH_SIZE = 3; // Smaller batches = faster per-step, fits in 60s window
+const BATCH_SIZE = 1; // Sequential to avoid OpenRouter 16 req/min account limit
 
 async function updateStatus(
   contentId: string,

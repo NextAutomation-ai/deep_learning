@@ -21,7 +21,7 @@ export const geminiProvider: AIProviderClient = {
       model: modelId,
       generationConfig: {
         temperature: request.temperature ?? 0.7,
-        maxOutputTokens: request.maxTokens ?? 4096,
+        maxOutputTokens: request.maxTokens ?? 1500,
         ...(request.responseFormat === "json"
           ? { responseMimeType: "application/json" }
           : {}),

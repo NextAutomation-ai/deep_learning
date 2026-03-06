@@ -30,7 +30,7 @@ export const openrouterProvider: AIProviderClient = {
         content: m.content,
       })),
       temperature: request.temperature ?? 0.7,
-      max_tokens: request.maxTokens ?? 4096,
+      max_tokens: request.maxTokens ?? 1500,
       ...(request.responseFormat === "json"
         ? { response_format: { type: "json_object" } }
         : {}),

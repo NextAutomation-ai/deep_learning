@@ -3,7 +3,7 @@ interface RateLimitEntry {
 }
 
 const limits: Record<string, { maxRequests: number; windowMs: number }> = {
-  openrouter: { maxRequests: 50, windowMs: 60_000 },
+  openrouter: { maxRequests: 14, windowMs: 60_000 },
   gemini: { maxRequests: 15, windowMs: 60_000 },
   claude: { maxRequests: 40, windowMs: 60_000 },
   grok: { maxRequests: 30, windowMs: 60_000 },
